@@ -1,0 +1,47 @@
+<div class="workspace-container">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-0 fw-bold text-white">
+        <i class="bi bi-people-fill me-2"></i>Gestión de Alumnos
+      </h3>
+      <p class="text-muted small mb-0">Directorio general de estudiantes</p>
+    </div>
+    <button class="btn btn-primary shadow-sm" id="btn-nuevo-alumno">
+      <i class="bi bi-person-plus-fill me-2"></i> Nuevo Alumno
+    </button>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2 px-3">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-transparent border-0 text-muted"
+          ><i class="bi bi-search"></i
+        ></span>
+        <input
+          type="text"
+          class="form-control border-0 shadow-none bg-transparent"
+          id="search-alumnos"
+          placeholder="Buscar por Nombre, Apellidos o N° de Control..."
+          style="font-size: 1rem"
+        />
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 panel-fill">
+    <div class="scroll-container">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="bg-dark">
+          <tr>
+            <th class="ps-4" style="width: 15%">N° Control</th>
+            <th style="width: 35%">Nombre Completo</th>
+            <th style="width: 20%">Ingreso</th>
+            <th style="width: 15%">Status</th>
+            <th class="text-end pe-4" style="width: 15%">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="alumnos-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>

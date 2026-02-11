@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+  <head>
+    <meta charset="UTF-A" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="script-src 'self' 'unsafe-inline';"
+    />
+    <title>Iniciar Sesión</title>
+    <link
+      rel="stylesheet"
+      href="./node_modules/bootstrap/dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="./node_modules/bootstrap-icons/font/bootstrap-icons.css"
+    />
+
+    <style>
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 40px;
+        padding-bottom: 40px;
+      }
+      .form-signin {
+        width: 100%;
+        max-width: 400px;
+        padding: 1.5rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 1rem;
+      }
+    </style>
+  </head>
+  <body class="text-center">
+    <main class="form-signin">
+      <form id="loginForm">
+        <i class="bi bi-bar-chart-fill" style="font-size: 3rem"></i>
+        <h1 class="h3 mb-3 fw-normal">Iniciar Sesión</h1>
+        <p class="text-body-secondary">Sistema de Indicadores Académicos</p>
+
+        <div class="form-floating mb-3">
+          <input
+            type="text"
+            class="form-control"
+            id="username"
+            placeholder="Usuario"
+            required
+          />
+          <label for="username">Nombre de usuario</label>
+        </div>
+        <div class="form-floating mb-3">
+          <input
+            type="password"
+            class="form-control"
+            id="password"
+            placeholder="Contraseña"
+            required
+          />
+          <label for="password">Contraseña</label>
+        </div>
+
+        <button class="w-100 btn btn-lg btn-primary" type="submit">
+          Entrar
+        </button>
+
+        <div id="error-message" class="alert alert-danger mt-3 d-none"></div>
+      </form>
+    </main>
+
+
+    <script>
+    const form = document.getElementById('loginForm');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const errorMessage = document.getElementById('error-message');
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault(); // Evita que el formulario se envíe (recargue la página)
+      
+      const username = usernameInput.value;
+      const password = passwordInput.value;
+
+      // Usamos la API que expusimos en preload.js para enviar los datos
+      window.electronAPI.send('login-attempt', { username, password });
+    });
+
+    // Escuchamos la respuesta de main.js
+    window.electronAPI.receive('login-response', (response) => {
+      if (response.success) {
+        // El login fue exitoso, main.js cerrará esta ventana
+        // y abrirá la principal. No necesitamos hacer nada aquí.
+      } else {
+        // Mostramos el error que nos envió main.js
+        errorMessage.textContent = response.message;
+        errorMessage.classList.remove('d-none'); // Hacemos visible el mensaje
+      }
+    });
+  </script>
+</body>
+</html>
+  </body>
+</html>

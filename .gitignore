@@ -1,0 +1,19 @@
+# Dependencias (Se instalan con npm install, no se suben)
+node_modules/
+
+# Archivos de log
+npm-debug.log
+yarn-error.log
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+
+# Base de datos (Opcional: Generalmente no se versionan los datos reales, solo la estructura)
+# Si quieres guardar tus alumnos de prueba, pon un # al inicio de la siguiente línea.
+# Si quieres hacerlo profesional (solo código), déjala como está:
+*.sqlite
+
+# Carpetas de compilación (si empaquetamos el ejecutable después)
+dist/
+out/

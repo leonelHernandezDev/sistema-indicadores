@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+  <head>
+    <meta charset="UTF-A" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="script-src 'self' 'unsafe-inline';"
+    />
+    <title>Configuración Inicial</title>
+    <link
+      rel="stylesheet"
+      href="./node_modules/bootstrap/dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="./node_modules/bootstrap-icons/font/bootstrap-icons.css"
+    />
+
+    <style>
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 40px;
+        padding-bottom: 40px;
+      }
+      .form-setup {
+        width: 100%;
+        max-width: 450px;
+        padding: 1.5rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 1rem;
+      }
+    </style>
+  </head>
+  <body class="text-center">
+    <main class="form-setup">
+      <form id="setupForm">
+        <i class="bi bi-shield-lock-fill" style="font-size: 3rem"></i>
+        <h1 class="h3 mb-3 fw-normal">Configuración Inicial</h1>
+        <p class="text-body-secondary">
+          Bienvenido. Por favor, crea la cuenta principal de Administrador.
+        </p>
+
+        <div class="form-floating mb-3">
+          <input
+            type="text"
+            class="form-control"
+            id="username"
+            placeholder="Usuario"
+            required
+          />
+          <label for="username">Crear nombre de usuario</label>
+        </div>
+        <div class="form-floating mb-3">
+          <input
+            type="password"
+            class="form-control"
+            id="password"
+            placeholder="Contraseña"
+            required
+          />
+          <label for="password">Crear contraseña</label>
+        </div>
+        <div class="form-floating mb-3">
+          <input
+            type="password"
+            class="form-control"
+            id="confirm-password"
+            placeholder="Confirmar"
+            required
+          />
+          <label for="confirm-password">Confirmar contraseña</label>
+        </div>
+
+        <button class="w-100 btn btn-lg btn-primary" type="submit">
+          Guardar y Empezar
+        </button>
+
+        <div id="error-message" class="alert alert-danger mt-3 d-none"></div>
+      </form>
+    </main>
+
+    <script>
+    const form = document.getElementById('setupForm');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirm-password');
+    const errorMessage = document.getElementById('error-message');
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const username = usernameInput.value;
+      const password = passwordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+
+      // 1. Verificamos que las contraseñas coincidan
+      if (password !== confirmPassword) {
+        errorMessage.textContent = 'Las contraseñas no coinciden.';
+        errorMessage.classList.remove('d-none');
+        return; // Detenemos el envío
+      }
+
+      // 2. Verificamos que los campos no estén vacíos (aunque 'required' ayuda)
+      if (!username || !password) {
+        errorMessage.textContent = 'Por favor, llena todos los campos.';
+        errorMessage.classList.remove('d-none');
+        return;
+      }
+
+      // 3. Si todo está bien, enviamos los datos a main.js
+      errorMessage.classList.add('d-none'); // Ocultamos errores previos
+      window.electronAPI.send('setup-create-admin', { username, password });
+    });
+
+    // Escuchamos por si main.js nos responde con un error
+    window.electronAPI.receive('setup-error', (message) => {
+      errorMessage.textContent = message;
+      errorMessage.classList.remove('d-none');
+    });
+  </script>
+</body>
+</html>
+  </body>
+</html>

@@ -1,0 +1,134 @@
+<div class="workspace-container">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-0 fw-bold text-white">
+        <i class="bi bi-journal-bookmark-fill me-2"></i>Control Académico
+      </h3>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2">
+      <div class="input-group">
+        <span class="input-group-text bg-transparent border-0 text-muted"
+          ><i class="bi bi-search"></i
+        ></span>
+        <input
+          type="text"
+          class="form-control border-0 bg-transparent shadow-none"
+          id="acad-search"
+          placeholder="Buscar alumno por nombre o control..."
+          autocomplete="off"
+        />
+      </div>
+      <div
+        class="list-group mt-2 d-none shadow position-absolute w-100 start-0"
+        id="acad-results"
+        style="z-index: 1050; top: 100%"
+      ></div>
+    </div>
+  </div>
+
+  <div id="acad-workspace" class="d-none panel-fill">
+    <div
+      class="card border-0 mb-3 bg-opacity-10 bg-primary"
+      style="
+        background-color: rgba(67, 97, 238, 0.05) !important;
+        border: 1px solid rgba(67, 97, 238, 0.2) !important;
+      "
+    >
+      <div class="card-body py-2 d-flex align-items-center">
+        <div
+          class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white me-3"
+          style="width: 40px; height: 40px"
+        >
+          <i class="bi bi-person-fill fs-5"></i>
+        </div>
+        <div>
+          <h5 class="mb-0 fw-bold text-white" id="lbl-alumno-nombre">
+            Nombre del Alumno
+          </h5>
+          <span class="text-primary small fw-bold" id="lbl-alumno-control"
+            >N° Control</span
+          >
+        </div>
+        <input type="hidden" id="selected-alumno-id" />
+      </div>
+    </div>
+
+    <div class="row h-100 g-3 pb-3">
+      <div class="col-md-4 col-xl-3">
+        <div class="card h-100 border-0">
+          <div class="card-header border-0">
+            <span class="text-uppercase small text-muted fw-bold"
+              >Registrar Calificación</span
+            >
+          </div>
+          <div class="card-body">
+            <form id="form-calificacion">
+              <div class="mb-3">
+                <label class="form-label text-muted small">Periodo</label>
+                <select id="acad-periodo" class="form-select" required></select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label text-muted small">Materia</label>
+                <input
+                  class="form-control"
+                  list="datalistOptions"
+                  id="acad-materia-input"
+                  placeholder="Buscar asignatura..."
+                  required
+                  autocomplete="off"
+                />
+                <datalist id="datalistOptions"></datalist>
+                <input type="hidden" id="acad-materia-id" />
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label text-muted small"
+                  >Calificación Final</label
+                >
+                <input
+                  type="number"
+                  id="acad-calificacion"
+                  class="form-control fs-4 fw-bold text-center text-white"
+                  min="0"
+                  max="100"
+                  required
+                />
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100 btn-lg shadow">
+                <i class="bi bi-check-lg"></i> Registrar
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-8 col-xl-9">
+        <div class="card h-100 border-0 panel-fill">
+          <div class="card-header border-0">
+            <span class="text-uppercase small text-muted fw-bold"
+              >Historial (Kardex)</span
+            >
+          </div>
+          <div class="scroll-container">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr>
+                  <th class="ps-4">Periodo</th>
+                  <th>Materia</th>
+                  <th class="text-center">Calif.</th>
+                  <th class="text-end pe-4">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="kardex-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

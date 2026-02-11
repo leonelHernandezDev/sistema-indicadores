@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="es" data-bs-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="script-src 'self' 'unsafe-inline';"
+    />
+    <title>Sistema de Indicadores</title>
+
+    <link
+      rel="stylesheet"
+      href="./node_modules/bootstrap/dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="./node_modules/bootstrap-icons/font/bootstrap-icons.css"
+    />
+
+    <style>
+      /* === 1. RESET Y ESTRUCTURA BASE (La base del scroll) === */
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* IMPORTANTE: La ventana nunca hace scroll */
+        background-color: #050505;
+        color: #e5e5e5;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+
+      /* === 2. LAYOUT PRINCIPAL === */
+      .main-container {
+        display: flex;
+        height: 100vh; /* 100% de la ventana */
+        width: 100vw;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 260px;
+        flex-shrink: 0;
+        background-color: #0a0a0a;
+        border-right: 1px solid #262626;
+        display: flex;
+        flex-direction: column;
+        padding-top: 1.5rem;
+        z-index: 10;
+      }
+
+      .content-area {
+        flex: 1; /* Ocupa el resto del ancho */
+        height: 100%; /* Ocupa todo el alto */
+        overflow: hidden;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* === 3. EL ESLABÓN PERDIDO (CONTENEDOR DE PÁGINAS) === */
+      #main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%; /* Forzamos altura */
+        min-height: 0; /* Permite encogerse */
+        overflow: hidden;
+      }
+
+      /* === 4. CLASES DE TUS PANTALLAS (Workspace) === */
+      .workspace-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* === 5. REPARACIÓN DE BOOTSTRAP (TABS Y GRID) === */
+      /* Esto arregla el "rompimiento" de la cadena de altura en config-periodos */
+
+      .tab-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .tab-pane {
+        width: 100%;
+        height: 100%; /* Forzamos altura */
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        display: none;
+      }
+
+      .tab-pane.active {
+        display: flex !important; /* Forzamos flex */
+      }
+
+      /* Hacemos que las filas y columnas de bootstrap ocupen altura completa */
+      .h-100 {
+        height: 100% !important;
+      }
+      .row.h-100 {
+        flex: 1;
+        min-height: 0;
+      }
+
+      /* === 6. TARJETAS Y PANELES === */
+      .card {
+        background-color: #141414;
+        border: 1px solid #262626;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Si la tarjeta tiene h-100 o panel-fill, aseguramos flex */
+      .card.h-100,
+      .card.panel-fill {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .card-header {
+        background-color: transparent;
+        border-bottom: 1px solid #262626;
+        flex-shrink: 0; /* El título nunca se aplasta */
+      }
+
+      .panel-fill {
+        flex: 1;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+
+      /* === 7. EL SCROLL (LA JOYA DE LA CORONA) === */
+      .scroll-container {
+        flex: 1 1 auto;
+        height: 0px; /* TRUCO: Altura 0 fuerza a flexbox a calcular el espacio real */
+        min-height: 0;
+        overflow-y: auto; /* ACTIVA EL SCROLL */
+        overflow-x: hidden;
+        display: block;
+      }
+
+      /* === ESTILOS VISUALES === */
+      .table {
+        color: #e5e5e5;
+        margin-bottom: 0;
+      }
+      .table thead th {
+        background-color: #1a1a1a;
+        color: #a3a3a3;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        border-bottom: 1px solid #262626;
+        box-shadow: 0 1px 0 #262626;
+      }
+      .table-hover tbody tr:hover {
+        background-color: #1f1f1f;
+      }
+
+      /* Inputs */
+      .form-control,
+      .form-select {
+        background-color: #0a0a0a;
+        border: 1px solid #262626;
+        color: white;
+      }
+      .form-control:focus {
+        background-color: #0a0a0a;
+        border-color: #4361ee;
+        color: white;
+        box-shadow: none;
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #050505;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 5px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+
+      /* Sidebar Links */
+      .sidebar .nav-link {
+        color: #a3a3a3;
+        margin: 0.2rem 1rem;
+      }
+      .sidebar .nav-link.active {
+        background-color: #4361ee;
+        color: white;
+      }
+      .sidebar .nav-link:hover:not(.active) {
+        background-color: #1f1f1f;
+        color: white;
+      }
+
+      /* Badges Semestres */
+      .badge-sem-1 {
+        background-color: #06b6d4;
+        color: #000;
+      }
+      .badge-sem-2 {
+        background-color: #f97316;
+        color: #fff;
+      }
+      .badge-sem-3 {
+        background-color: #eab308;
+        color: #000;
+      }
+      .badge-sem-4 {
+        background-color: #22c55e;
+        color: #000;
+      }
+      .badge-sem-5 {
+        background-color: #3b82f6;
+        color: #fff;
+      }
+      .badge-sem-6 {
+        background-color: #6366f1;
+        color: #fff;
+      }
+      .badge-sem-7 {
+        background-color: #a855f7;
+        color: #fff;
+      }
+      .badge-sem-8 {
+        background-color: #ec4899;
+        color: #fff;
+      }
+      .badge-sem-9 {
+        background-color: #f43f5e;
+        color: #fff;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="main-container">
+      <div class="sidebar">
+        <h4 class="px-3 mb-4 text-white">Sistema Académico</h4>
+
+        <ul class="nav nav-pills flex-column mb-auto" id="main-nav">
+          <li class="nav-item">
+            <a
+              href="#"
+              class="nav-link active"
+              id="nav-inicio"
+              data-page="inicio"
+            >
+              <i class="bi bi-house-door-fill me-2"></i> Inicio
+            </a>
+          </li>
+          <li class="nav-item">
+            <a
+              href="#"
+              class="nav-link"
+              id="nav-alumnos"
+              data-page="gestion-alumnos"
+            >
+              <i class="bi bi-person-fill me-2"></i> Alumnos
+            </a>
+          </li>
+          <li class="nav-item">
+            <a
+              href="#"
+              class="nav-link"
+              id="nav-academico"
+              data-page="academico"
+            >
+              <i class="bi bi-journal-bookmark-fill me-2"></i> Académico
+            </a>
+          </li>
+          <li class="nav-item">
+            <a
+              href="#"
+              class="nav-link"
+              id="nav-titulacion"
+              data-page="titulacion"
+            >
+              <i class="bi bi-mortarboard-fill me-2"></i> Titulación
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="#" class="nav-link" id="nav-reportes" data-page="reportes">
+              <i class="bi bi-bar-chart-fill me-2"></i> Reportes
+            </a>
+          </li>
+          <li class="nav-item">
+            <a
+              href="#"
+              class="nav-link"
+              id="nav-config"
+              data-page="config-periodos"
+            >
+              <i class="bi bi-gear-fill me-2"></i> Configuración
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="content-area">
+        <div id="main-content"></div>
+      </div>
+    </div>
+
+    <script src="./node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      const mainContent = document.getElementById("main-content");
+      const navLinks = document.querySelectorAll("#main-nav a.nav-link");
+
+      async function loadContent(pageName, data = null) {
+        if (!pageName || pageName === "titulacion" || pageName === "reportes") {
+          mainContent.innerHTML =
+            '<div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">' +
+            '<h1><i class="bi bi-cone-striped display-1"></i></h1>' +
+            "<h3>En Construcción</h3>" +
+            "<p>Esta sección estará disponible próximamente.</p></div>";
+          return;
+        }
+
+        try {
+          const response = await fetch(`./pantallas/${pageName}.html`);
+          if (!response.ok) throw new Error("Página no encontrada");
+          const html = await response.text();
+          mainContent.innerHTML = html;
+
+          if (pageName === "gestion-alumnos") {
+            await cargarAlumnos();
+            conectarBotonesAlumnos();
+          } else if (pageName === "form-alumno") {
+            await conectarBotonesFormAlumno(data);
+          } else if (pageName === "config-periodos") {
+            await setupConfigPeriodos();
+          } else if (pageName === "academico") {
+            await setupAcademico();
+          }
+        } catch (error) {
+          console.error("Error al cargar la página:", error);
+          mainContent.innerHTML = "<h1>Error al cargar</h1>";
+        }
+      }
+
+      function handleNavClick(e) {
+        e.preventDefault();
+        navLinks.forEach((link) => link.classList.remove("active"));
+        const clickedLink = e.currentTarget;
+        clickedLink.classList.add("active");
+        const pageToLoad = clickedLink.dataset.page;
+        loadContent(pageToLoad);
+      }
+      navLinks.forEach((link) =>
+        link.addEventListener("click", handleNavClick),
+      );
+
+      loadContent("inicio");
+
+      // ==========================================
+      //    LÓGICA: CONFIGURACIÓN
+      // ==========================================
+      async function setupConfigPeriodos() {
+        const formPeriodo = document.getElementById("form-periodo");
+        const inputNombrePeriodo = document.getElementById("nombre_periodo");
+        const tablePeriodos = document.getElementById("periodos-table-body");
+
+        const listarPeriodos = async () => {
+          tablePeriodos.innerHTML =
+            '<tr><td colspan="2" class="text-center">Cargando...</td></tr>';
+          try {
+            const periodos = await window.electronAPI.invoke("get-periodos");
+            tablePeriodos.innerHTML = "";
+            if (periodos.length === 0)
+              tablePeriodos.innerHTML =
+                '<tr><td colspan="2" class="text-center text-muted">Sin registros</td></tr>';
+            periodos.forEach((p) => {
+              const row = document.createElement("tr");
+              row.innerHTML = `
+              <td class="ps-4 fw-bold">${p.nombre}</td>
+              <td class="text-end pe-4">
+                <button class="btn btn-sm btn-outline-danger btn-borrar-periodo border-0" data-id="${p.id_periodo}"><i class="bi bi-trash"></i></button>
+              </td>`;
+              tablePeriodos.appendChild(row);
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        };
+        await listarPeriodos();
+
+        if (formPeriodo) {
+          formPeriodo.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const nombre = inputNombrePeriodo.value.trim().toUpperCase();
+            if (!/^\d{4}-[1-2]$/.test(nombre)) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Formato inválido. Usa AAAA-P (Ej: 2025-1)",
+              );
+              return;
+            }
+            try {
+              const res = await window.electronAPI.invoke(
+                "add-periodo",
+                nombre,
+              );
+              if (res.success) {
+                inputNombrePeriodo.value = "";
+                await listarPeriodos();
+                inputNombrePeriodo.focus();
+              }
+            } catch (error) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error: " + error.message,
+              );
+            }
+          });
+        }
+
+        if (tablePeriodos) {
+          tablePeriodos.addEventListener("click", async (e) => {
+            const btn = e.target.closest(".btn-borrar-periodo");
+            if (!btn) return;
+            if (
+              await window.electronAPI.invoke(
+                "dialog-confirm",
+                "¿Eliminar este periodo?",
+              )
+            ) {
+              try {
+                await window.electronAPI.invoke(
+                  "delete-periodo",
+                  btn.dataset.id,
+                );
+                await listarPeriodos();
+              } catch (error) {
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "Error: " + error.message,
+                );
+              }
+            }
+          });
+        }
+
+        // MATERIAS
+        const formMateria = document.getElementById("form-materia");
+        const inputNombreMateria = document.getElementById("nombre_materia");
+        const inputSemestre = document.getElementById("semestre_materia");
+        const tableMaterias = document.getElementById("materias-table-body");
+        let idMateriaAEditar = null;
+        const btnGuardarMateria = formMateria
+          ? formMateria.querySelector('button[type="submit"]')
+          : null;
+
+        const obtenerBadgeSemestre = (semestre) => {
+          const indice = ((semestre - 1) % 9) + 1;
+          return `<span class="badge badge-sem-${indice} px-3 py-1 rounded-pill shadow-sm" style="min-width: 100px;">${semestre}° Semestre</span>`;
+        };
+
+        const listarMaterias = async () => {
+          if (!tableMaterias) return;
+          tableMaterias.innerHTML =
+            '<tr><td colspan="3" class="text-center">Cargando...</td></tr>';
+          try {
+            const materias = await window.electronAPI.invoke("get-materias");
+            tableMaterias.innerHTML = "";
+            if (materias.length === 0)
+              tableMaterias.innerHTML =
+                '<tr><td colspan="3" class="text-center text-muted">Sin registros</td></tr>';
+            materias.forEach((m) => {
+              const row = document.createElement("tr");
+              row.innerHTML = `
+              <td class="ps-4">${obtenerBadgeSemestre(m.semestre_ideal)}</td>
+              <td class="fw-bold">${m.nombre_materia}</td>
+              <td class="text-end pe-4">
+                <button class="btn btn-sm btn-outline-warning btn-editar-materia border-0 me-1" 
+                  data-id="${m.id_materia}" data-nombre="${m.nombre_materia}" data-semestre="${m.semestre_ideal}">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-borrar-materia border-0" data-id="${m.id_materia}">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>`;
+              tableMaterias.appendChild(row);
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        };
+        await listarMaterias();
+
+        if (formMateria) {
+          formMateria.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const nombre = inputNombreMateria.value.trim();
+            const semestre = inputSemestre.value;
+            try {
+              let res;
+              if (idMateriaAEditar) {
+                res = await window.electronAPI.invoke("update-materia", {
+                  id: idMateriaAEditar,
+                  nombre,
+                  semestre,
+                });
+              } else {
+                res = await window.electronAPI.invoke("add-materia", {
+                  nombre,
+                  semestre,
+                });
+              }
+              if (res.success) {
+                inputNombreMateria.value = "";
+                inputSemestre.value = 1;
+                idMateriaAEditar = null;
+                btnGuardarMateria.innerHTML =
+                  '<i class="bi bi-save me-2"></i> Guardar Materia';
+                btnGuardarMateria.classList.replace(
+                  "btn-warning",
+                  "btn-success",
+                );
+                await listarMaterias();
+                inputNombreMateria.focus();
+              }
+            } catch (error) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error: " + error.message,
+              );
+            }
+          });
+        }
+
+        if (tableMaterias) {
+          tableMaterias.addEventListener("click", async (e) => {
+            const btnEditar = e.target.closest(".btn-editar-materia");
+            if (btnEditar) {
+              idMateriaAEditar = btnEditar.dataset.id;
+              inputNombreMateria.value = btnEditar.dataset.nombre;
+              inputSemestre.value = btnEditar.dataset.semestre;
+              btnGuardarMateria.innerHTML =
+                '<i class="bi bi-pencil-square me-2"></i> Actualizar';
+              btnGuardarMateria.classList.replace("btn-success", "btn-warning");
+              inputNombreMateria.focus();
+              return;
+            }
+            const btnBorrar = e.target.closest(".btn-borrar-materia");
+            if (btnBorrar) {
+              if (
+                await window.electronAPI.invoke(
+                  "dialog-confirm",
+                  "¿Eliminar esta materia?",
+                )
+              ) {
+                try {
+                  await window.electronAPI.invoke(
+                    "delete-materia",
+                    btnBorrar.dataset.id,
+                  );
+                  if (idMateriaAEditar == btnBorrar.dataset.id) {
+                    formMateria.reset();
+                    idMateriaAEditar = null;
+                    btnGuardarMateria.innerHTML =
+                      '<i class="bi bi-save me-2"></i> Guardar Materia';
+                    btnGuardarMateria.classList.replace(
+                      "btn-warning",
+                      "btn-success",
+                    );
+                  }
+                  await listarMaterias();
+                } catch (error) {
+                  await window.electronAPI.invoke(
+                    "dialog-alert",
+                    "Error: " + error.message,
+                  );
+                }
+              }
+            }
+          });
+        }
+      }
+
+      // ==========================================
+      //    LÓGICA: ALUMNOS
+      // ==========================================
+      async function cargarAlumnos() {
+        const tableBody = document.getElementById("alumnos-table-body");
+        if (!tableBody) return;
+        tableBody.innerHTML =
+          '<tr><td colspan="5" class="text-center">Cargando...</td></tr>';
+        try {
+          const alumnos = await window.electronAPI.invoke("get-alumnos");
+          tableBody.innerHTML = "";
+          if (alumnos.length === 0) {
+            tableBody.innerHTML =
+              '<tr><td colspan="5" class="text-center text-muted">Sin alumnos registrados.</td></tr>';
+            return;
+          }
+          alumnos.forEach((alumno) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+            <td class="ps-4 fw-bold font-monospace text-primary">${alumno.numero_control}</td>
+            <td>${alumno.apellido_paterno} ${alumno.apellido_materno} ${alumno.nombre}</td>
+            <td>${alumno.periodo_ingreso_nombre || "N/A"}</td>
+            <td><span class="badge ${alumno.status === "Activo" ? "bg-success" : "bg-secondary"}">${alumno.status}</span></td>
+            <td class="text-end pe-4">
+              <button class="btn btn-sm btn-outline-warning btn-editar-alumno border-0 me-1" data-id="${alumno.id_alumno}"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-outline-danger btn-eliminar-alumno border-0" data-id="${alumno.id_alumno}"><i class="bi bi-trash"></i></button>
+            </td>`;
+            tableBody.appendChild(row);
+          });
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      async function eliminarAlumno(id) {
+        if (
+          await window.electronAPI.invoke("dialog-confirm", "¿Eliminar alumno?")
+        ) {
+          try {
+            const resultado = await window.electronAPI.invoke(
+              "delete-alumno",
+              id,
+            );
+            if (resultado.success) cargarAlumnos();
+          } catch (error) {
+            await window.electronAPI.invoke(
+              "dialog-alert",
+              "Error: " + error.message,
+            );
+          }
+        }
+      }
+
+      function conectarBotonesAlumnos() {
+        const btnNuevo = document.getElementById("btn-nuevo-alumno");
+        if (btnNuevo)
+          btnNuevo.addEventListener("click", () => loadContent("form-alumno"));
+        const searchInput = document.getElementById("search-alumnos");
+        if (searchInput) {
+          searchInput.addEventListener("input", (e) => {
+            const texto = e.target.value.toLowerCase();
+            const filas = document.querySelectorAll("#alumnos-table-body tr");
+            filas.forEach((fila) => {
+              const contenido = fila.textContent.toLowerCase();
+              fila.style.display = contenido.includes(texto) ? "" : "none";
+            });
+          });
+        }
+        const tableBody = document.getElementById("alumnos-table-body");
+        if (tableBody) {
+          tableBody.addEventListener("click", async (e) => {
+            const btnEliminar = e.target.closest(".btn-eliminar-alumno");
+            const btnEditar = e.target.closest(".btn-editar-alumno");
+            if (btnEliminar) await eliminarAlumno(btnEliminar.dataset.id);
+            if (btnEditar) loadContent("form-alumno", btnEditar.dataset.id);
+          });
+        }
+      }
+
+      async function conectarBotonesFormAlumno(idAlumnoAEditar = null) {
+        const form = document.getElementById("form-alumno");
+        if (!form) return;
+        const btnVolver = document.getElementById("btn-volver-alumnos");
+        const selectPeriodos = document.getElementById("id_periodo_ingreso_fk");
+        const messageDiv = document.getElementById("form-message");
+        const tituloPagina = document.querySelector("h1");
+        const btnGuardar = form.querySelector('button[type="submit"]');
+
+        try {
+          const periodos = await window.electronAPI.invoke("get-periodos");
+          if (periodos.length === 0) {
+            selectPeriodos.innerHTML =
+              '<option value="" disabled>Sin periodos.</option>';
+          } else {
+            selectPeriodos.innerHTML =
+              '<option value="" selected disabled>Selecciona...</option>';
+            periodos.forEach((p) => {
+              selectPeriodos.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`;
+            });
+          }
+        } catch (e) {
+          console.error(e);
+        }
+
+        if (idAlumnoAEditar) {
+          tituloPagina.innerHTML =
+            '<i class="bi bi-pencil-square"></i> Editar Alumno';
+          btnGuardar.innerHTML = '<i class="bi bi-save-fill"></i> Actualizar';
+          try {
+            const alumno = await window.electronAPI.invoke(
+              "get-alumno-by-id",
+              idAlumnoAEditar,
+            );
+            document.getElementById("numero_control").value =
+              alumno.numero_control;
+            document.getElementById("nombre").value = alumno.nombre;
+            document.getElementById("apellido_paterno").value =
+              alumno.apellido_paterno;
+            document.getElementById("apellido_materno").value =
+              alumno.apellido_materno;
+            document.getElementById("genero").value = alumno.genero;
+            document.getElementById("fecha_nacimiento").value =
+              alumno.fecha_nacimiento;
+            document.getElementById("status").value = alumno.status;
+            if (alumno.id_periodo_ingreso_fk)
+              selectPeriodos.value = alumno.id_periodo_ingreso_fk;
+          } catch (error) {
+            console.error(error);
+          }
+        }
+
+        btnVolver.addEventListener("click", () =>
+          loadContent("gestion-alumnos"),
+        );
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const alumnoData = {
+            id_alumno: idAlumnoAEditar,
+            numero_control: document.getElementById("numero_control").value,
+            nombre: document.getElementById("nombre").value,
+            apellido_paterno: document.getElementById("apellido_paterno").value,
+            apellido_materno: document.getElementById("apellido_materno").value,
+            genero: document.getElementById("genero").value,
+            fecha_nacimiento: document.getElementById("fecha_nacimiento").value,
+            status: document.getElementById("status").value,
+            id_periodo_ingreso_fk: document.getElementById(
+              "id_periodo_ingreso_fk",
+            ).value,
+          };
+
+          if (!alumnoData.id_periodo_ingreso_fk) {
+            if (messageDiv) {
+              messageDiv.textContent = "Selecciona un periodo.";
+              messageDiv.classList.remove("d-none");
+            } else {
+              alert("Selecciona un periodo");
+            }
+            return;
+          }
+
+          try {
+            let response;
+            if (idAlumnoAEditar)
+              response = await window.electronAPI.invoke(
+                "update-alumno",
+                alumnoData,
+              );
+            else
+              response = await window.electronAPI.invoke(
+                "add-alumno",
+                alumnoData,
+              );
+
+            if (response.success) loadContent("gestion-alumnos");
+          } catch (error) {
+            if (messageDiv) {
+              messageDiv.textContent = `Error: ${error.message}`;
+              messageDiv.className = "alert alert-danger mt-3";
+              messageDiv.classList.remove("d-none");
+            }
+          }
+        });
+      }
+
+      // ==========================================
+      //    LÓGICA: ACADÉMICO
+      // ==========================================
+      async function setupAcademico() {
+        const searchInput = document.getElementById("acad-search");
+        const resultsList = document.getElementById("acad-results");
+        const workspace = document.getElementById("acad-workspace");
+
+        const lblNombre = document.getElementById("lbl-alumno-nombre");
+        const lblControl = document.getElementById("lbl-alumno-control");
+        const hiddenId = document.getElementById("selected-alumno-id");
+
+        const selectPeriodo = document.getElementById("acad-periodo");
+        const formCalificacion = document.getElementById("form-calificacion");
+        const tableKardex = document.getElementById("kardex-table-body");
+        const inputMateriaBusqueda =
+          document.getElementById("acad-materia-input");
+        const datalistMaterias = document.getElementById("datalistOptions");
+        const hiddenMateriaId = document.getElementById("acad-materia-id");
+        let catalogoMaterias = [];
+
+        try {
+          const periodos = await window.electronAPI.invoke("get-periodos");
+          if (selectPeriodo) {
+            selectPeriodo.innerHTML =
+              '<option value="" selected disabled>Selecciona...</option>';
+            periodos.forEach(
+              (p) =>
+                (selectPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`),
+            );
+          }
+
+          catalogoMaterias = await window.electronAPI.invoke("get-materias");
+          catalogoMaterias.sort((a, b) =>
+            a.nombre_materia.localeCompare(b.nombre_materia),
+          );
+          if (datalistMaterias) {
+            datalistMaterias.innerHTML = "";
+            catalogoMaterias.forEach((m) => {
+              const option = document.createElement("option");
+              option.value = m.nombre_materia;
+              datalistMaterias.appendChild(option);
+            });
+          }
+        } catch (e) {
+          console.error(e);
+        }
+
+        if (inputMateriaBusqueda) {
+          inputMateriaBusqueda.addEventListener("change", (e) => {
+            const nombreSeleccionado = e.target.value;
+            const materiaEncontrada = catalogoMaterias.find(
+              (m) => m.nombre_materia === nombreSeleccionado,
+            );
+            hiddenMateriaId.value = materiaEncontrada
+              ? materiaEncontrada.id_materia
+              : "";
+          });
+        }
+
+        let todosLosAlumnos = [];
+        try {
+          todosLosAlumnos = await window.electronAPI.invoke("get-alumnos");
+        } catch (e) {}
+
+        if (searchInput) {
+          searchInput.addEventListener("input", (e) => {
+            const texto = e.target.value.toLowerCase();
+            resultsList.innerHTML = "";
+            if (texto.length < 2) {
+              resultsList.classList.add("d-none");
+              return;
+            }
+            const filtrados = todosLosAlumnos.filter(
+              (a) =>
+                a.nombre.toLowerCase().includes(texto) ||
+                a.apellido_paterno.toLowerCase().includes(texto) ||
+                a.numero_control.toLowerCase().includes(texto),
+            );
+            if (filtrados.length > 0) {
+              resultsList.classList.remove("d-none");
+              filtrados.slice(0, 5).forEach((alumno) => {
+                const item = document.createElement("button");
+                item.className =
+                  "list-group-item list-group-item-action list-group-item-dark";
+                item.innerHTML = `<strong class="text-primary">${alumno.numero_control}</strong> - ${alumno.nombre} ${alumno.apellido_paterno}`;
+                item.onclick = () => seleccionarAlumno(alumno);
+                resultsList.appendChild(item);
+              });
+            } else {
+              resultsList.classList.add("d-none");
+            }
+          });
+        }
+
+        const seleccionarAlumno = async (alumno) => {
+          resultsList.classList.add("d-none");
+          searchInput.value = "";
+          workspace.classList.remove("d-none");
+          lblNombre.textContent = `${alumno.nombre} ${alumno.apellido_paterno} ${alumno.apellido_materno || ""}`;
+          lblControl.textContent = alumno.numero_control;
+          hiddenId.value = alumno.id_alumno;
+          await cargarKardex(alumno.id_alumno);
+        };
+
+        const cargarKardex = async (idAlumno) => {
+          tableKardex.innerHTML =
+            '<tr><td colspan="4" class="text-center">Cargando...</td></tr>';
+          try {
+            const historial = await window.electronAPI.invoke(
+              "get-kardex",
+              idAlumno,
+            );
+            tableKardex.innerHTML = "";
+            if (historial.length === 0) {
+              tableKardex.innerHTML =
+                '<tr><td colspan="4" class="text-center text-muted">Sin calificaciones</td></tr>';
+              return;
+            }
+            historial.forEach((h) => {
+              const row = document.createElement("tr");
+              const colorCalif =
+                h.calificacion < 70
+                  ? "text-danger fw-bold"
+                  : "fw-bold text-success";
+              row.innerHTML = `
+              <td class="ps-4">${h.nombre_periodo}</td>
+              <td>${h.nombre_materia}</td>
+              <td class="${colorCalif} text-center">${h.calificacion}</td>
+              <td class="text-end pe-4">
+                <button class="btn btn-sm btn-outline-danger btn-borrar-calif border-0" data-id="${h.id_inscripcion}"><i class="bi bi-x-lg"></i></button>
+              </td>`;
+              tableKardex.appendChild(row);
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        if (formCalificacion) {
+          formCalificacion.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const idAlumno = hiddenId.value;
+            const idMateria = hiddenMateriaId.value;
+            if (!idAlumno) return;
+            if (!idMateria) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Materia no válida.",
+              );
+              return;
+            }
+            const datos = {
+              id_alumno: idAlumno,
+              id_periodo: selectPeriodo.value,
+              id_materia: idMateria,
+              calificacion: document.getElementById("acad-calificacion").value,
+            };
+            try {
+              const res = await window.electronAPI.invoke(
+                "add-calificacion",
+                datos,
+              );
+              if (res.success) {
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "Calificación registrada.",
+                );
+                await cargarKardex(idAlumno);
+                document.getElementById("acad-calificacion").value = "";
+                inputMateriaBusqueda.value = "";
+                hiddenMateriaId.value = "";
+                inputMateriaBusqueda.focus();
+              }
+            } catch (error) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error: " + error.message,
+              );
+            }
+          });
+        }
+
+        if (tableKardex) {
+          tableKardex.addEventListener("click", async (e) => {
+            const btn = e.target.closest(".btn-borrar-calif");
+            if (!btn) return;
+            if (
+              await window.electronAPI.invoke(
+                "dialog-confirm",
+                "¿Eliminar calificación?",
+              )
+            ) {
+              try {
+                await window.electronAPI.invoke(
+                  "delete-calificacion",
+                  btn.dataset.id,
+                );
+                await cargarKardex(hiddenId.value);
+              } catch (error) {
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "Error: " + error.message,
+                );
+              }
+            }
+          });
+        }
+      }
+    </script>
+  </body>
+</html>
