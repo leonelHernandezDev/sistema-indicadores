@@ -331,7 +331,7 @@
       const navLinks = document.querySelectorAll("#main-nav a.nav-link");
 
       async function loadContent(pageName, data = null) {
-        if (!pageName || pageName === "titulacion" || pageName === "reportes") {
+        if (!pageName || pageName === "reportes") {
           mainContent.innerHTML =
             '<div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">' +
             '<h1><i class="bi bi-cone-striped display-1"></i></h1>' +
@@ -355,6 +355,8 @@
             await setupConfigPeriodos();
           } else if (pageName === "academico") {
             await setupAcademico();
+          } else if (pageName === "titulacion") {
+            await setupTitulacion();
           }
         } catch (error) {
           console.error("Error al cargar la página:", error);
@@ -994,6 +996,239 @@
             }
           });
         }
+      }
+
+      // ==========================================
+      //    LÓGICA: TITULACIÓN (FINAL)
+      // ==========================================
+      async function setupTitulacion() {
+        const searchInput = document.getElementById("tit-search");
+        const resultsList = document.getElementById("tit-results");
+
+        const cardAlumno = document.getElementById("tit-alumno-card");
+        const lblNombre = document.getElementById("tit-alumno-nombre");
+        const lblControl = document.getElementById("tit-alumno-control");
+        const lblStatus = document.getElementById("tit-alumno-status");
+        const hiddenId = document.getElementById("tit-selected-id");
+
+        const formTitulacion = document.getElementById("form-titulacion");
+        const instructionMsg = document.getElementById("tit-instruction");
+        const tableBody = document.getElementById("titulados-table-body");
+        const lblTotal = document.getElementById("total-titulados");
+
+        const cargarTitulados = async () => {
+          tableBody.innerHTML =
+            '<tr><td colspan="6" class="text-center">Cargando...</td></tr>';
+          try {
+            const lista = await window.electronAPI.invoke("get-titulados");
+            tableBody.innerHTML = "";
+            lblTotal.textContent = `${lista.length} Registros`;
+
+            if (lista.length === 0) {
+              tableBody.innerHTML =
+                '<tr><td colspan="6" class="text-center text-muted py-4">No hay actas registradas.<br><small>Utiliza el formulario para titular alumnos.</small></td></tr>';
+              return;
+            }
+
+            lista.forEach((t) => {
+              const folioDisplay = t.folio_acta
+                ? `<span class="text-warning font-monospace">${t.folio_acta}</span>`
+                : '<span class="badge bg-secondary opacity-50">En Trámite</span>';
+
+              // Badge de Mención Honorífica
+              const mencionBadge =
+                t.mencion_honorifica === 1
+                  ? '<i class="bi bi-star-fill text-warning ms-1" title="Mención Honorífica"></i>'
+                  : "";
+
+              const row = document.createElement("tr");
+              row.innerHTML = `
+                <td class="ps-4">${folioDisplay}</td>
+                <td class="fw-bold">
+                    ${t.nombre} ${t.apellido_paterno}
+                    <div class="small text-muted font-monospace">${t.numero_control}</div>
+                </td>
+                <td class="text-center">
+                    <span class="fw-bold text-white">${t.promedio}</span>
+                    ${mencionBadge}
+                </td>
+                <td><span class="badge bg-dark border border-secondary">${t.modalidad}</span></td>
+                <td class="small text-muted">${t.fecha_titulacion}</td>
+                <td class="text-end pe-4">
+                   <button class="btn btn-sm btn-outline-danger btn-borrar-titulacion border-0" data-id="${t.id_titulacion}">
+                     <i class="bi bi-trash"></i>
+                   </button>
+                </td>
+              `;
+              tableBody.appendChild(row);
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        await cargarTitulados();
+
+        let todosLosAlumnos = [];
+        try {
+          todosLosAlumnos = await window.electronAPI.invoke("get-alumnos");
+        } catch (e) {}
+
+        searchInput.addEventListener("input", (e) => {
+          const texto = e.target.value.toLowerCase();
+          resultsList.innerHTML = "";
+
+          if (texto.length < 2) {
+            resultsList.classList.add("d-none");
+            return;
+          }
+
+          const filtrados = todosLosAlumnos.filter(
+            (a) =>
+              a.nombre.toLowerCase().includes(texto) ||
+              a.apellido_paterno.toLowerCase().includes(texto) ||
+              a.numero_control.toLowerCase().includes(texto),
+          );
+
+          if (filtrados.length > 0) {
+            resultsList.classList.remove("d-none");
+            filtrados.slice(0, 5).forEach((alumno) => {
+              const item = document.createElement("button");
+              item.className =
+                "list-group-item list-group-item-action list-group-item-dark d-flex justify-content-between align-items-center";
+
+              const statusBadge =
+                alumno.status === "Titulado"
+                  ? '<span class="badge bg-success ms-2"><i class="bi bi-check-circle"></i> Titulado</span>'
+                  : "";
+
+              item.innerHTML = `
+                <div>
+                  <strong class="text-primary">${alumno.numero_control}</strong> - ${alumno.nombre} ${alumno.apellido_paterno}
+                </div>
+                ${statusBadge}
+              `;
+
+              item.onclick = () => seleccionarAlumno(alumno);
+              resultsList.appendChild(item);
+            });
+          } else {
+            resultsList.classList.add("d-none");
+          }
+        });
+
+        const seleccionarAlumno = (alumno) => {
+          searchInput.value = "";
+          resultsList.classList.add("d-none");
+
+          instructionMsg.classList.add("d-none");
+          cardAlumno.classList.remove("d-none");
+
+          lblNombre.textContent = `${alumno.nombre} ${alumno.apellido_paterno} ${alumno.apellido_materno || ""}`;
+          lblControl.textContent = alumno.numero_control;
+          lblStatus.textContent = alumno.status;
+
+          if (alumno.status === "Titulado")
+            lblStatus.className = "badge bg-success";
+          else if (alumno.status === "Egresado")
+            lblStatus.className = "badge bg-info text-dark";
+          else lblStatus.className = "badge bg-secondary";
+
+          hiddenId.value = alumno.id_alumno;
+
+          if (alumno.status === "Titulado") {
+            formTitulacion.classList.add("d-none");
+            window.electronAPI.invoke(
+              "dialog-alert",
+              "Este alumno ya cuenta con acta de titulación.",
+            );
+          } else {
+            formTitulacion.classList.remove("d-none");
+            document.getElementById("tit-folio").focus();
+          }
+        };
+
+        formTitulacion.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const idAlumno = hiddenId.value;
+          const folio = document
+            .getElementById("tit-folio")
+            .value.trim()
+            .toUpperCase();
+          const modalidad = document.getElementById("tit-modalidad").value;
+          const fecha = document.getElementById("tit-fecha").value;
+          const promedio = document.getElementById("tit-promedio").value;
+          const mencion = document.getElementById("tit-mencion").checked
+            ? 1
+            : 0;
+
+          if (!idAlumno || !fecha || !modalidad || !promedio) return;
+
+          const confirmado = await window.electronAPI.invoke(
+            "dialog-confirm",
+            "¿Confirmar titulación? Verifica que los datos del acta sean correctos.",
+          );
+
+          if (confirmado) {
+            try {
+              const res = await window.electronAPI.invoke("titular-alumno", {
+                id_alumno: idAlumno,
+                fecha,
+                modalidad,
+                folio,
+                promedio,
+                mencion,
+              });
+
+              if (res.success) {
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "¡Acta registrada exitosamente!",
+                );
+
+                formTitulacion.reset();
+                formTitulacion.classList.add("d-none");
+                cardAlumno.classList.add("d-none");
+                instructionMsg.classList.remove("d-none");
+
+                todosLosAlumnos =
+                  await window.electronAPI.invoke("get-alumnos");
+                await cargarTitulados();
+              }
+            } catch (error) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error: " + error.message,
+              );
+            }
+          }
+        });
+
+        tableBody.addEventListener("click", async (e) => {
+          const btn = e.target.closest(".btn-borrar-titulacion");
+          if (!btn) return;
+
+          const confirmar = await window.electronAPI.invoke(
+            "dialog-confirm",
+            "¿Eliminar acta? El alumno dejará de estar titulado.",
+          );
+
+          if (confirmar) {
+            try {
+              await window.electronAPI.invoke(
+                "delete-titulacion",
+                btn.dataset.id,
+              );
+              todosLosAlumnos = await window.electronAPI.invoke("get-alumnos");
+              await cargarTitulados();
+            } catch (error) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error: " + error.message,
+              );
+            }
+          }
+        });
       }
     </script>
   </body>

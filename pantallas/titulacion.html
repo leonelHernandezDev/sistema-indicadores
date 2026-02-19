@@ -1,0 +1,193 @@
+<div class="workspace-container">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-0 fw-bold text-white">
+        <i class="bi bi-mortarboard-fill me-2"></i>Módulo de Titulación
+      </h3>
+      <p class="text-muted small mb-0">
+        Gestión de actas, modalidades y cambio de estatus.
+      </p>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2">
+      <div class="input-group">
+        <span class="input-group-text bg-transparent border-0 text-muted">
+          <i class="bi bi-search"></i>
+        </span>
+        <input
+          type="text"
+          class="form-control border-0 bg-transparent shadow-none"
+          id="tit-search"
+          placeholder="Buscar alumno por nombre o control..."
+          autocomplete="off"
+        />
+      </div>
+      <div
+        class="list-group mt-2 d-none shadow position-absolute w-100 start-0"
+        id="tit-results"
+        style="z-index: 1050; top: 100%"
+      ></div>
+    </div>
+  </div>
+
+  <div class="row h-100 g-3 pb-3 panel-fill">
+    <div class="col-md-4 col-xl-3 d-flex flex-column h-100">
+      <div class="card h-100 border-0">
+        <div class="card-header border-0">
+          <span class="text-uppercase small text-muted fw-bold"
+            >Datos del Acta</span
+          >
+        </div>
+        <div class="card-body d-flex flex-column scroll-container">
+          <div
+            id="tit-alumno-card"
+            class="alert alert-dark border-0 mb-3 d-none"
+          >
+            <h6 class="fw-bold text-white mb-1" id="tit-alumno-nombre">
+              Nombre Alumno
+            </h6>
+            <div class="d-flex justify-content-between align-items-center">
+              <small class="text-primary font-monospace" id="tit-alumno-control"
+                >00000000</small
+              >
+              <span class="badge bg-secondary" id="tit-alumno-status"
+                >Status</span
+              >
+            </div>
+            <input type="hidden" id="tit-selected-id" />
+          </div>
+
+          <form id="form-titulacion" class="d-none mt-2">
+            <div class="mb-3">
+              <div class="d-flex justify-content-between">
+                <label
+                  class="form-label text-muted small text-uppercase fw-bold"
+                  >Folio Acta</label
+                >
+                <span
+                  class="badge bg-secondary opacity-50 small"
+                  style="font-size: 0.65rem"
+                  >OPCIONAL</span
+                >
+              </div>
+              <input
+                type="text"
+                id="tit-folio"
+                class="form-control font-monospace text-warning"
+                placeholder="Ej: 2026-001"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label text-muted small text-uppercase fw-bold"
+                >Modalidad *</label
+              >
+              <select id="tit-modalidad" class="form-select" required>
+                <option value="" selected disabled>Seleccione...</option>
+                <option value="Tesis Profesional">Tesis Profesional</option>
+                <option value="Residencia Profesional">
+                  Memoria de Residencia
+                </option>
+                <option value="Promedio">Promedio (Excelencia)</option>
+                <option value="Experiencia Profesional">
+                  Experiencia Profesional
+                </option>
+                <option value="Ceneval">Examen CENEVAL</option>
+              </select>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label
+                  class="form-label text-muted small text-uppercase fw-bold"
+                  >Promedio *</label
+                >
+                <input
+                  type="number"
+                  id="tit-promedio"
+                  class="form-control fw-bold text-center"
+                  min="60"
+                  max="100"
+                  step="0.1"
+                  placeholder="0.0"
+                  required
+                />
+              </div>
+              <div class="col-6 d-flex align-items-end">
+                <div
+                  class="form-check form-switch w-100 p-2 border border-secondary rounded bg-dark mb-0"
+                >
+                  <input
+                    class="form-check-input ms-0 me-2"
+                    type="checkbox"
+                    role="switch"
+                    id="tit-mencion"
+                  />
+                  <label
+                    class="form-check-label small text-white"
+                    for="tit-mencion"
+                    >Mención Honorífica</label
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label text-muted small text-uppercase fw-bold"
+                >Fecha del Acto *</label
+              >
+              <input type="date" id="tit-fecha" class="form-control" required />
+            </div>
+
+            <div class="d-grid mt-4 pb-3">
+              <button type="submit" class="btn btn-success btn-lg shadow">
+                <i class="bi bi-patch-check-fill me-2"></i> Titular
+              </button>
+            </div>
+          </form>
+
+          <div id="tit-instruction" class="text-center text-muted my-auto">
+            <i class="bi bi-arrow-up-circle fs-1 d-block mb-2 opacity-25"></i>
+            <p class="small">
+              Busca un alumno para iniciar el trámite de titulación.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-8 col-xl-9 d-flex flex-column h-100">
+      <div class="card h-100 border-0 panel-fill">
+        <div
+          class="card-header border-0 d-flex justify-content-between align-items-center"
+        >
+          <span class="text-uppercase small text-muted fw-bold"
+            >Libro de Actas</span
+          >
+          <span
+            class="badge bg-dark border border-secondary"
+            id="total-titulados"
+            >0 Registros</span
+          >
+        </div>
+        <div class="scroll-container">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th class="ps-4">Folio</th>
+                <th>Alumno</th>
+                <th class="text-center">Promedio</th>
+                <th>Modalidad</th>
+                <th>Fecha</th>
+                <th class="text-end pe-4">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="titulados-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

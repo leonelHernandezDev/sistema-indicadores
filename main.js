@@ -52,11 +52,15 @@ function setupDatabase() {
       semestre_ideal INTEGER
     )`);
 
-    // 5. Tabla Titulados
+    // 5. Tabla Titulados (VERSIÓN 3 - FINAL)
     db.run(`CREATE TABLE IF NOT EXISTS Titulados (
       id_titulacion INTEGER PRIMARY KEY AUTOINCREMENT,
       id_alumno_fk INTEGER NOT NULL,
       fecha_titulacion TEXT NOT NULL,
+      modalidad TEXT NOT NULL,
+      folio_acta TEXT,
+      promedio REAL,             -- Nuevo campo
+      mencion_honorifica INTEGER, -- Nuevo campo (0 o 1)
       FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno)
     )`);
 
@@ -671,5 +675,161 @@ ipcMain.handle("update-materia", async (event, data) => {
       if (err) reject(err);
       else resolve({ success: true });
     });
+  });
+});
+
+// ==========================================
+//    MÓDULO DE TITULACIÓN (FINAL)
+// ==========================================
+
+ipcMain.handle("titular-alumno", async (event, data) => {
+  return new Promise((resolve, reject) => {
+    // Desestructuramos los nuevos datos
+    const { id_alumno, fecha, modalidad, folio, promedio, mencion } = data;
+
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+
+      const sqlInsert = `
+        INSERT INTO Titulados 
+        (id_alumno_fk, fecha_titulacion, modalidad, folio_acta, promedio, mencion_honorifica) 
+        VALUES (?, ?, ?, ?, ?, ?)
+      `;
+
+      db.run(
+        sqlInsert,
+        [id_alumno, fecha, modalidad, folio, promedio, mencion],
+        function (err) {
+          if (err) {
+            db.run("ROLLBACK");
+            return reject(err);
+          }
+
+          const sqlUpdate =
+            "UPDATE Alumnos SET status = 'Titulado' WHERE id_alumno = ?";
+          db.run(sqlUpdate, [id_alumno], function (err2) {
+            if (err2) {
+              db.run("ROLLBACK");
+              return reject(err2);
+            }
+
+            db.run("COMMIT");
+            resolve({ success: true });
+          });
+        },
+      );
+    });
+  });
+});
+
+ipcMain.handle("get-titulados", async (event) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT t.*, a.nombre, a.apellido_paterno, a.apellido_materno, a.numero_control
+      FROM Titulados t
+      JOIN Alumnos a ON t.id_alumno_fk = a.id_alumno
+      ORDER BY t.fecha_titulacion DESC
+    `;
+    db.all(sql, [], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
+ipcMain.handle("delete-titulacion", async (event, id_titulacion) => {
+  return new Promise((resolve, reject) => {
+    db.get(
+      "SELECT id_alumno_fk FROM Titulados WHERE id_titulacion = ?",
+      [id_titulacion],
+      (err, row) => {
+        if (err || !row)
+          return reject(err || new Error("Registro no encontrado"));
+
+        const id_alumno = row.id_alumno_fk;
+
+        db.serialize(() => {
+          db.run("BEGIN TRANSACTION");
+          db.run(
+            "DELETE FROM Titulados WHERE id_titulacion = ?",
+            [id_titulacion],
+            (errDel) => {
+              if (errDel) {
+                db.run("ROLLBACK");
+                return reject(errDel);
+              }
+              db.run(
+                "UPDATE Alumnos SET status = 'Egresado' WHERE id_alumno = ?",
+                [id_alumno],
+                (errUpd) => {
+                  if (errUpd) {
+                    db.run("ROLLBACK");
+                    return reject(errUpd);
+                  }
+                  db.run("COMMIT");
+                  resolve({ success: true });
+                },
+              );
+            },
+          );
+        });
+      },
+    );
+  });
+});
+
+ipcMain.handle("get-titulados", async (event) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT t.*, a.nombre, a.apellido_paterno, a.apellido_materno, a.numero_control
+      FROM Titulados t
+      JOIN Alumnos a ON t.id_alumno_fk = a.id_alumno
+      ORDER BY t.fecha_titulacion DESC
+    `;
+    db.all(sql, [], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
+ipcMain.handle("delete-titulacion", async (event, id_titulacion) => {
+  return new Promise((resolve, reject) => {
+    db.get(
+      "SELECT id_alumno_fk FROM Titulados WHERE id_titulacion = ?",
+      [id_titulacion],
+      (err, row) => {
+        if (err || !row)
+          return reject(err || new Error("Registro no encontrado"));
+
+        const id_alumno = row.id_alumno_fk;
+
+        db.serialize(() => {
+          db.run("BEGIN TRANSACTION");
+          db.run(
+            "DELETE FROM Titulados WHERE id_titulacion = ?",
+            [id_titulacion],
+            (errDel) => {
+              if (errDel) {
+                db.run("ROLLBACK");
+                return reject(errDel);
+              }
+              db.run(
+                "UPDATE Alumnos SET status = 'Egresado' WHERE id_alumno = ?",
+                [id_alumno],
+                (errUpd) => {
+                  if (errUpd) {
+                    db.run("ROLLBACK");
+                    return reject(errUpd);
+                  }
+                  db.run("COMMIT");
+                  resolve({ success: true });
+                },
+              );
+            },
+          );
+        });
+      },
+    );
   });
 });
