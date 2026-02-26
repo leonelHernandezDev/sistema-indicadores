@@ -119,7 +119,7 @@
                     required
                   />
                 </div>
-                <div class="mb-4">
+                <div class="mb-3">
                   <label class="form-label text-muted small"
                     >Semestre Ideal</label
                   >
@@ -130,6 +130,20 @@
                     min="1"
                     max="12"
                     value="1"
+                    required
+                  />
+                </div>
+                <div class="mb-4">
+                  <label class="form-label text-muted small"
+                    >Créditos de la Materia</label
+                  >
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="creditos_materia"
+                    min="1"
+                    max="50"
+                    value="5"
                     required
                   />
                 </div>
@@ -154,6 +168,7 @@
                   <tr>
                     <th class="ps-4">Semestre</th>
                     <th>Asignatura</th>
+                    <th class="text-center">Créditos</th>
                     <th class="text-end pe-4">Acciones</th>
                   </tr>
                 </thead>

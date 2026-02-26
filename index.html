@@ -382,6 +382,7 @@
       //    LÓGICA: CONFIGURACIÓN
       // ==========================================
       async function setupConfigPeriodos() {
+        // --- 1. PERIODOS ---
         const formPeriodo = document.getElementById("form-periodo");
         const inputNombrePeriodo = document.getElementById("nombre_periodo");
         const tablePeriodos = document.getElementById("periodos-table-body");
@@ -466,10 +467,11 @@
           });
         }
 
-        // MATERIAS
+        // --- 2. MATERIAS (CON CRÉDITOS INTEGRADOS) ---
         const formMateria = document.getElementById("form-materia");
         const inputNombreMateria = document.getElementById("nombre_materia");
         const inputSemestre = document.getElementById("semestre_materia");
+        const inputCreditos = document.getElementById("creditos_materia"); // ¡NUEVO!
         const tableMaterias = document.getElementById("materias-table-body");
         let idMateriaAEditar = null;
         const btnGuardarMateria = formMateria
@@ -482,23 +484,39 @@
         };
 
         const listarMaterias = async () => {
-          if (!tableMaterias) return;
+          console.log("1. Ejecutando listarMaterias...");
+          if (!tableMaterias) {
+            console.log(
+              "❌ ERROR SILENCIOSO: No se encontró la tabla 'materias-table-body' en el HTML.",
+            );
+            return; // Si no hay tabla, se detiene aquí silenciosamente.
+          }
+          console.log("2. Tabla encontrada en el HTML.");
           tableMaterias.innerHTML =
-            '<tr><td colspan="3" class="text-center">Cargando...</td></tr>';
+            '<tr><td colspan="4" class="text-center">Cargando...</td></tr>';
+
           try {
+            console.log("3. Pidiendo materias a la base de datos...");
             const materias = await window.electronAPI.invoke("get-materias");
+            console.log("4. Materias recibidas:", materias);
+
             tableMaterias.innerHTML = "";
-            if (materias.length === 0)
+            if (materias.length === 0) {
+              console.log("⚠️ La base de datos dice que hay 0 materias.");
               tableMaterias.innerHTML =
-                '<tr><td colspan="3" class="text-center text-muted">Sin registros</td></tr>';
+                '<tr><td colspan="4" class="text-center text-muted">Sin registros</td></tr>';
+              return;
+            }
+
             materias.forEach((m) => {
               const row = document.createElement("tr");
               row.innerHTML = `
               <td class="ps-4">${obtenerBadgeSemestre(m.semestre_ideal)}</td>
               <td class="fw-bold">${m.nombre_materia}</td>
+              <td class="text-center"><span class="badge bg-secondary">${m.creditos || 0}</span></td>
               <td class="text-end pe-4">
                 <button class="btn btn-sm btn-outline-warning btn-editar-materia border-0 me-1" 
-                  data-id="${m.id_materia}" data-nombre="${m.nombre_materia}" data-semestre="${m.semestre_ideal}">
+                  data-id="${m.id_materia}" data-nombre="${m.nombre_materia}" data-semestre="${m.semestre_ideal}" data-creditos="${m.creditos || 0}">
                   <i class="bi bi-pencil"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger btn-borrar-materia border-0" data-id="${m.id_materia}">
@@ -507,8 +525,9 @@
               </td>`;
               tableMaterias.appendChild(row);
             });
+            console.log("5. Tabla dibujada con éxito en la pantalla.");
           } catch (e) {
-            console.error(e);
+            console.error("❌ ERROR ROJO EN CATCH:", e);
           }
         };
         await listarMaterias();
@@ -518,6 +537,8 @@
             e.preventDefault();
             const nombre = inputNombreMateria.value.trim();
             const semestre = inputSemestre.value;
+            const creditos = inputCreditos.value; // ¡NUEVO!
+
             try {
               let res;
               if (idMateriaAEditar) {
@@ -525,16 +546,19 @@
                   id: idMateriaAEditar,
                   nombre,
                   semestre,
+                  creditos, // ¡NUEVO!
                 });
               } else {
                 res = await window.electronAPI.invoke("add-materia", {
                   nombre,
                   semestre,
+                  creditos, // ¡NUEVO!
                 });
               }
               if (res.success) {
                 inputNombreMateria.value = "";
                 inputSemestre.value = 1;
+                inputCreditos.value = 5; // Limpiamos al valor por defecto
                 idMateriaAEditar = null;
                 btnGuardarMateria.innerHTML =
                   '<i class="bi bi-save me-2"></i> Guardar Materia';
@@ -561,6 +585,8 @@
               idMateriaAEditar = btnEditar.dataset.id;
               inputNombreMateria.value = btnEditar.dataset.nombre;
               inputSemestre.value = btnEditar.dataset.semestre;
+              inputCreditos.value = btnEditar.dataset.creditos; // Recuperamos los créditos!
+
               btnGuardarMateria.innerHTML =
                 '<i class="bi bi-pencil-square me-2"></i> Actualizar';
               btnGuardarMateria.classList.replace("btn-success", "btn-warning");
@@ -582,6 +608,7 @@
                   );
                   if (idMateriaAEditar == btnBorrar.dataset.id) {
                     formMateria.reset();
+                    inputCreditos.value = 5;
                     idMateriaAEditar = null;
                     btnGuardarMateria.innerHTML =
                       '<i class="bi bi-save me-2"></i> Guardar Materia';
