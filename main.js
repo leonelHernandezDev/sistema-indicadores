@@ -45,6 +45,14 @@ function setupDatabase() {
       nombre TEXT UNIQUE NOT NULL
     )`);
 
+    // 3.5. NUEVA Tabla Grupos (Amarrada a Periodos)
+    db.run(`CREATE TABLE IF NOT EXISTS Grupos (
+      id_grupo INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre_grupo TEXT NOT NULL,
+      id_periodo_fk INTEGER NOT NULL,
+      FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo)
+    )`);
+
     // 4. Tabla Materias (ACTUALIZADA CON CRÉDITOS)
     db.run(`CREATE TABLE IF NOT EXISTS Materias (
       id_materia INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,18 +73,19 @@ function setupDatabase() {
       FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno)
     )`);
 
-    // 6. Tabla Inscripciones (ACTUALIZADA CON ESTADO Y GRUPO FLOTANTE)
+    // 6. Tabla Inscripciones (ACTUALIZADA: Cambio de 'grupo TEXT' a 'id_grupo_fk INTEGER')
     db.run(`CREATE TABLE IF NOT EXISTS Inscripciones (
       id_inscripcion INTEGER PRIMARY KEY AUTOINCREMENT,
       id_alumno_fk INTEGER NOT NULL,
       id_materia_fk INTEGER NOT NULL,
       id_periodo_fk INTEGER NOT NULL,
-      grupo TEXT, -- Permite NULL si sacamos al alumno del grupo (Materia Flotante)
-      calificacion REAL, -- Permite NULL mientras cursa
-      estado_materia TEXT DEFAULT 'Cursando', -- ¡NUEVO CAMPO! (Cursando, Aprobada, Reprobada, Baja)
+      id_grupo_fk INTEGER NOT NULL, -- ¡NUEVO CAMPO RELACIONAL OFICIAL!
+      calificacion REAL, 
+      estado_materia TEXT DEFAULT 'Cursando', 
       FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno),
       FOREIGN KEY (id_materia_fk) REFERENCES Materias(id_materia),
-      FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo)
+      FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo),
+      FOREIGN KEY (id_grupo_fk) REFERENCES Grupos(id_grupo)
     )`);
 
     console.log("Base de datos y tablas aseguradas.");
@@ -486,6 +495,55 @@ ipcMain.handle("delete-periodo", async (event, id) => {
   });
 });
 
+// ==========================================
+//    MÓDULO DE GRUPOS (NUEVO)
+// ==========================================
+
+ipcMain.handle("add-grupo", async (event, data) => {
+  return new Promise((resolve, reject) => {
+    const { nombre_grupo, id_periodo } = data;
+    const sql =
+      "INSERT INTO Grupos (nombre_grupo, id_periodo_fk) VALUES (?, ?)";
+    db.run(sql, [nombre_grupo, id_periodo], function (err) {
+      if (err) reject(err);
+      else resolve({ success: true, id: this.lastID });
+    });
+  });
+});
+
+ipcMain.handle("update-grupo", async (event, data) => {
+  return new Promise((resolve, reject) => {
+    const { id_grupo, nombre_grupo } = data;
+    const sql = "UPDATE Grupos SET nombre_grupo = ? WHERE id_grupo = ?";
+    db.run(sql, [nombre_grupo, id_grupo], function (err) {
+      if (err) reject(err);
+      else resolve({ success: true });
+    });
+  });
+});
+
+ipcMain.handle("get-grupos-por-periodo", async (event, id_periodo) => {
+  return new Promise((resolve, reject) => {
+    // Solo trae los grupos que pertenecen al periodo seleccionado
+    const sql =
+      "SELECT * FROM Grupos WHERE id_periodo_fk = ? ORDER BY nombre_grupo ASC";
+    db.all(sql, [id_periodo], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
+ipcMain.handle("delete-grupo", async (event, id_grupo) => {
+  return new Promise((resolve, reject) => {
+    const sql = "DELETE FROM Grupos WHERE id_grupo = ?";
+    db.run(sql, [id_grupo], function (err) {
+      if (err) reject(err);
+      else resolve({ success: true });
+    });
+  });
+});
+
 /**
  * Muestra un diálogo nativo del sistema (Windows/Mac)
  * Retorna true si el usuario dice "Sí", false si dice "No/Cancelar"
@@ -686,14 +744,16 @@ ipcMain.handle("update-materia", async (event, data) => {
  * NUEVO: Guarda múltiples calificaciones de golpe (Sábana Inteligente)
  * Recibe un array de objetos con las calificaciones de todo un grupo
  */
+/**
+ * Guarda múltiples calificaciones (ACTUALIZADO PARA id_grupo_fk)
+ */
 ipcMain.handle("save-calificaciones-masivas", async (event, arrayDatos) => {
   return new Promise((resolve, reject) => {
-    // Usamos una transacción para que, si falla uno, no se guarde a medias y se corrompa
     db.serialize(() => {
       db.run("BEGIN TRANSACTION");
 
       const sql = `
-        INSERT INTO Inscripciones (id_alumno_fk, id_materia_fk, id_periodo_fk, grupo, calificacion, estado_materia) 
+        INSERT INTO Inscripciones (id_alumno_fk, id_materia_fk, id_periodo_fk, id_grupo_fk, calificacion, estado_materia) 
         VALUES (?, ?, ?, ?, ?, ?)
       `;
       const stmt = db.prepare(sql);
@@ -701,14 +761,13 @@ ipcMain.handle("save-calificaciones-masivas", async (event, arrayDatos) => {
       let errores = 0;
 
       arrayDatos.forEach((dato) => {
-        // Lógica automática de estados:
         let estado = "Cursando";
         if (dato.calificacion !== null && dato.calificacion !== "") {
           estado =
             parseFloat(dato.calificacion) >= 70 ? "Aprobada" : "Reprobada";
         }
         if (dato.estado_forzado) {
-          estado = dato.estado_forzado; // Por si el asistente lo marca como "Baja" manual
+          estado = dato.estado_forzado;
         }
 
         stmt.run(
@@ -716,7 +775,7 @@ ipcMain.handle("save-calificaciones-masivas", async (event, arrayDatos) => {
             dato.id_alumno,
             dato.id_materia,
             dato.id_periodo,
-            dato.grupo,
+            dato.id_grupo_fk,
             dato.calificacion,
             estado,
           ],
@@ -729,9 +788,7 @@ ipcMain.handle("save-calificaciones-masivas", async (event, arrayDatos) => {
       stmt.finalize((err) => {
         if (err || errores > 0) {
           db.run("ROLLBACK");
-          reject(
-            new Error("Error al guardar la lista grupal. Verifica duplicados."),
-          );
+          reject(new Error("Error al guardar la lista. Verifica los datos."));
         } else {
           db.run("COMMIT");
           resolve({ success: true });
@@ -742,20 +799,19 @@ ipcMain.handle("save-calificaciones-masivas", async (event, arrayDatos) => {
 });
 
 /**
- * NUEVO: Obtiene a los alumnos inscritos en un grupo y materia específicos
- * Útil para cargar la sábana si ya se había capturado algo antes.
+ * Obtiene alumnos inscritos (ACTUALIZADO PARA id_grupo_fk)
  */
 ipcMain.handle("get-grupo-especifico", async (event, data) => {
   return new Promise((resolve, reject) => {
-    const { id_periodo, id_materia, grupo } = data;
+    const { id_periodo, id_materia, id_grupo_fk } = data;
     const sql = `
       SELECT i.*, a.nombre, a.apellido_paterno, a.apellido_materno, a.numero_control 
       FROM Inscripciones i
       JOIN Alumnos a ON i.id_alumno_fk = a.id_alumno
-      WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? AND i.grupo = ?
+      WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? AND i.id_grupo_fk = ?
       ORDER BY a.apellido_paterno, a.apellido_materno, a.nombre
     `;
-    db.all(sql, [id_periodo, id_materia, grupo], (err, rows) => {
+    db.all(sql, [id_periodo, id_materia, id_grupo_fk], (err, rows) => {
       if (err) reject(err);
       else resolve(rows);
     });

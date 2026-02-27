@@ -382,6 +382,26 @@
       //    LÓGICA: CONFIGURACIÓN
       // ==========================================
       async function setupConfigPeriodos() {
+        // Variables globales de la vista
+        const selectGrupoPeriodo = document.getElementById("grupo_periodo");
+
+        // Función HOISTED: Para que cualquier pestaña pueda actualizar la lista de grupos
+        async function cargarPeriodosEnGrupos() {
+          if (!selectGrupoPeriodo) return;
+          const valorActual = selectGrupoPeriodo.value; // Guardar lo que estaba seleccionado
+          try {
+            const periodos = await window.electronAPI.invoke("get-periodos");
+            selectGrupoPeriodo.innerHTML =
+              '<option value="">Seleccione un periodo...</option>';
+            periodos.forEach((p) => {
+              selectGrupoPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`;
+            });
+            if (valorActual) selectGrupoPeriodo.value = valorActual; // Restaurar selección
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
         // --- 1. PERIODOS ---
         const formPeriodo = document.getElementById("form-periodo");
         const inputNombrePeriodo = document.getElementById("nombre_periodo");
@@ -430,6 +450,7 @@
               if (res.success) {
                 inputNombrePeriodo.value = "";
                 await listarPeriodos();
+                await cargarPeriodosEnGrupos(); // ¡PARCHE DE REACTIVIDAD!
                 inputNombrePeriodo.focus();
               }
             } catch (error) {
@@ -457,6 +478,7 @@
                   btn.dataset.id,
                 );
                 await listarPeriodos();
+                await cargarPeriodosEnGrupos(); // ¡PARCHE DE REACTIVIDAD!
               } catch (error) {
                 await window.electronAPI.invoke(
                   "dialog-alert",
@@ -471,7 +493,7 @@
         const formMateria = document.getElementById("form-materia");
         const inputNombreMateria = document.getElementById("nombre_materia");
         const inputSemestre = document.getElementById("semestre_materia");
-        const inputCreditos = document.getElementById("creditos_materia"); // ¡NUEVO!
+        const inputCreditos = document.getElementById("creditos_materia");
         const tableMaterias = document.getElementById("materias-table-body");
         let idMateriaAEditar = null;
         const btnGuardarMateria = formMateria
@@ -484,29 +506,15 @@
         };
 
         const listarMaterias = async () => {
-          console.log("1. Ejecutando listarMaterias...");
-          if (!tableMaterias) {
-            console.log(
-              "❌ ERROR SILENCIOSO: No se encontró la tabla 'materias-table-body' en el HTML.",
-            );
-            return; // Si no hay tabla, se detiene aquí silenciosamente.
-          }
-          console.log("2. Tabla encontrada en el HTML.");
+          if (!tableMaterias) return;
           tableMaterias.innerHTML =
             '<tr><td colspan="4" class="text-center">Cargando...</td></tr>';
-
           try {
-            console.log("3. Pidiendo materias a la base de datos...");
             const materias = await window.electronAPI.invoke("get-materias");
-            console.log("4. Materias recibidas:", materias);
-
             tableMaterias.innerHTML = "";
-            if (materias.length === 0) {
-              console.log("⚠️ La base de datos dice que hay 0 materias.");
+            if (materias.length === 0)
               tableMaterias.innerHTML =
                 '<tr><td colspan="4" class="text-center text-muted">Sin registros</td></tr>';
-              return;
-            }
 
             materias.forEach((m) => {
               const row = document.createElement("tr");
@@ -525,9 +533,8 @@
               </td>`;
               tableMaterias.appendChild(row);
             });
-            console.log("5. Tabla dibujada con éxito en la pantalla.");
           } catch (e) {
-            console.error("❌ ERROR ROJO EN CATCH:", e);
+            console.error(e);
           }
         };
         await listarMaterias();
@@ -537,7 +544,7 @@
             e.preventDefault();
             const nombre = inputNombreMateria.value.trim();
             const semestre = inputSemestre.value;
-            const creditos = inputCreditos.value; // ¡NUEVO!
+            const creditos = inputCreditos.value;
 
             try {
               let res;
@@ -546,19 +553,19 @@
                   id: idMateriaAEditar,
                   nombre,
                   semestre,
-                  creditos, // ¡NUEVO!
+                  creditos,
                 });
               } else {
                 res = await window.electronAPI.invoke("add-materia", {
                   nombre,
                   semestre,
-                  creditos, // ¡NUEVO!
+                  creditos,
                 });
               }
               if (res.success) {
                 inputNombreMateria.value = "";
                 inputSemestre.value = 1;
-                inputCreditos.value = 5; // Limpiamos al valor por defecto
+                inputCreditos.value = 5;
                 idMateriaAEditar = null;
                 btnGuardarMateria.innerHTML =
                   '<i class="bi bi-save me-2"></i> Guardar Materia';
@@ -585,7 +592,7 @@
               idMateriaAEditar = btnEditar.dataset.id;
               inputNombreMateria.value = btnEditar.dataset.nombre;
               inputSemestre.value = btnEditar.dataset.semestre;
-              inputCreditos.value = btnEditar.dataset.creditos; // Recuperamos los créditos!
+              inputCreditos.value = btnEditar.dataset.creditos;
 
               btnGuardarMateria.innerHTML =
                 '<i class="bi bi-pencil-square me-2"></i> Actualizar';
@@ -622,6 +629,174 @@
                   await window.electronAPI.invoke(
                     "dialog-alert",
                     "Error: " + error.message,
+                  );
+                }
+              }
+            }
+          });
+        }
+
+        // --- 3. GRUPOS (NUEVO MÓDULO ACTUALIZADO) ---
+        const formGrupo = document.getElementById("form-grupo");
+        const inputNombreGrupo = document.getElementById("nombre_grupo");
+        const tableGrupos = document.getElementById("grupos-table-body");
+        let idGrupoAEditar = null; // Variable para saber si estamos editando
+        const btnGuardarGrupo = formGrupo
+          ? formGrupo.querySelector('button[type="submit"]')
+          : null;
+
+        // Cargar periodos al inicio
+        await cargarPeriodosEnGrupos();
+
+        const listarGrupos = async () => {
+          const id_periodo = selectGrupoPeriodo.value;
+          if (!id_periodo) {
+            tableGrupos.innerHTML =
+              '<tr><td colspan="2" class="text-center text-muted">Selecciona un periodo a la izquierda para ver sus grupos</td></tr>';
+            return;
+          }
+
+          tableGrupos.innerHTML =
+            '<tr><td colspan="2" class="text-center">Cargando...</td></tr>';
+          try {
+            const grupos = await window.electronAPI.invoke(
+              "get-grupos-por-periodo",
+              id_periodo,
+            );
+            tableGrupos.innerHTML = "";
+
+            if (grupos.length === 0) {
+              tableGrupos.innerHTML =
+                '<tr><td colspan="2" class="text-center text-muted">Aún no hay grupos creados para este periodo</td></tr>';
+              return;
+            }
+
+            grupos.forEach((g) => {
+              const row = document.createElement("tr");
+              row.innerHTML = `
+                <td class="ps-4 fw-bold text-primary">Grupo ${g.nombre_grupo}</td>
+                <td class="text-end pe-4">
+                  <button class="btn btn-sm btn-outline-warning btn-editar-grupo border-0 me-1" 
+                    data-id="${g.id_grupo}" data-nombre="${g.nombre_grupo}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger btn-borrar-grupo border-0" data-id="${g.id_grupo}">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              `;
+              tableGrupos.appendChild(row);
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        if (selectGrupoPeriodo) {
+          selectGrupoPeriodo.addEventListener("change", () => {
+            // Si cambias de periodo, cancelamos la edición
+            idGrupoAEditar = null;
+            inputNombreGrupo.value = "";
+            if (btnGuardarGrupo) {
+              btnGuardarGrupo.innerHTML =
+                '<i class="bi bi-plus-lg"></i> Agregar Grupo';
+              btnGuardarGrupo.classList.replace("btn-warning", "btn-primary");
+            }
+            listarGrupos();
+          });
+        }
+
+        if (formGrupo) {
+          formGrupo.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const id_periodo = selectGrupoPeriodo.value;
+            const nombre_grupo = inputNombreGrupo.value.trim().toUpperCase();
+
+            if (!id_periodo) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Por favor, selecciona un Periodo Escolar primero.",
+              );
+              return;
+            }
+
+            try {
+              let res;
+              // Lógica: Si hay ID es Update, si no es Add
+              if (idGrupoAEditar) {
+                res = await window.electronAPI.invoke("update-grupo", {
+                  id_grupo: idGrupoAEditar,
+                  nombre_grupo,
+                });
+              } else {
+                res = await window.electronAPI.invoke("add-grupo", {
+                  nombre_grupo,
+                  id_periodo,
+                });
+              }
+
+              if (res.success) {
+                inputNombreGrupo.value = "";
+                idGrupoAEditar = null;
+                btnGuardarGrupo.innerHTML =
+                  '<i class="bi bi-plus-lg"></i> Agregar Grupo';
+                btnGuardarGrupo.classList.replace("btn-warning", "btn-primary");
+                await listarGrupos();
+                inputNombreGrupo.focus();
+              }
+            } catch (error) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error: " + error.message,
+              );
+            }
+          });
+        }
+
+        if (tableGrupos) {
+          tableGrupos.addEventListener("click", async (e) => {
+            // Click en Editar
+            const btnEditar = e.target.closest(".btn-editar-grupo");
+            if (btnEditar) {
+              idGrupoAEditar = btnEditar.dataset.id;
+              inputNombreGrupo.value = btnEditar.dataset.nombre;
+
+              btnGuardarGrupo.innerHTML =
+                '<i class="bi bi-pencil-square me-2"></i> Actualizar Grupo';
+              btnGuardarGrupo.classList.replace("btn-primary", "btn-warning");
+              inputNombreGrupo.focus();
+              return;
+            }
+
+            // Click en Borrar
+            const btnBorrar = e.target.closest(".btn-borrar-grupo");
+            if (btnBorrar) {
+              if (
+                await window.electronAPI.invoke(
+                  "dialog-confirm",
+                  "¿Estás seguro de eliminar este grupo? \n(Asegúrate de no tener alumnos inscritos en él)",
+                )
+              ) {
+                try {
+                  await window.electronAPI.invoke(
+                    "delete-grupo",
+                    btnBorrar.dataset.id,
+                  );
+                  if (idGrupoAEditar == btnBorrar.dataset.id) {
+                    formGrupo.reset();
+                    idGrupoAEditar = null;
+                    btnGuardarGrupo.innerHTML =
+                      '<i class="bi bi-plus-lg"></i> Agregar Grupo';
+                    btnGuardarGrupo.classList.replace(
+                      "btn-warning",
+                      "btn-primary",
+                    );
+                  }
+                  await listarGrupos();
+                } catch (error) {
+                  await window.electronAPI.invoke(
+                    "dialog-alert",
+                    "Error al borrar: " + error.message,
                   );
                 }
               }
@@ -816,178 +991,173 @@
       }
 
       // ==========================================
-      //    LÓGICA: ACADÉMICO
+      //    LÓGICA: CONTROL ACADÉMICO (KÁRDEX Y SÁBANA)
       // ==========================================
       async function setupAcademico() {
-        const searchInput = document.getElementById("acad-search");
-        const resultsList = document.getElementById("acad-results");
-        const workspace = document.getElementById("acad-workspace");
-
-        const lblNombre = document.getElementById("lbl-alumno-nombre");
-        const lblControl = document.getElementById("lbl-alumno-control");
-        const hiddenId = document.getElementById("selected-alumno-id");
-
-        const selectPeriodo = document.getElementById("acad-periodo");
-        const formCalificacion = document.getElementById("form-calificacion");
-        const tableKardex = document.getElementById("kardex-table-body");
-        const inputMateriaBusqueda =
-          document.getElementById("acad-materia-input");
-        const datalistMaterias = document.getElementById("datalistOptions");
-        const hiddenMateriaId = document.getElementById("acad-materia-id");
-        let catalogoMaterias = [];
-
-        try {
-          const periodos = await window.electronAPI.invoke("get-periodos");
-          if (selectPeriodo) {
-            selectPeriodo.innerHTML =
-              '<option value="" selected disabled>Selecciona...</option>';
-            periodos.forEach(
-              (p) =>
-                (selectPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`),
-            );
-          }
-
-          catalogoMaterias = await window.electronAPI.invoke("get-materias");
-          catalogoMaterias.sort((a, b) =>
-            a.nombre_materia.localeCompare(b.nombre_materia),
-          );
-          if (datalistMaterias) {
-            datalistMaterias.innerHTML = "";
-            catalogoMaterias.forEach((m) => {
-              const option = document.createElement("option");
-              option.value = m.nombre_materia;
-              datalistMaterias.appendChild(option);
-            });
-          }
-        } catch (e) {
-          console.error(e);
-        }
-
-        if (inputMateriaBusqueda) {
-          inputMateriaBusqueda.addEventListener("change", (e) => {
-            const nombreSeleccionado = e.target.value;
-            const materiaEncontrada = catalogoMaterias.find(
-              (m) => m.nombre_materia === nombreSeleccionado,
-            );
-            hiddenMateriaId.value = materiaEncontrada
-              ? materiaEncontrada.id_materia
-              : "";
-          });
-        }
-
+        // 1. Cargar catálogos compartidos
         let todosLosAlumnos = [];
+        let periodos = [];
+        let materias = [];
         try {
           todosLosAlumnos = await window.electronAPI.invoke("get-alumnos");
-        } catch (e) {}
+          periodos = await window.electronAPI.invoke("get-periodos");
+          materias = await window.electronAPI.invoke("get-materias");
+        } catch (error) {
+          console.error("Error cargando catálogos:", error);
+        }
 
-        if (searchInput) {
-          searchInput.addEventListener("input", (e) => {
-            const texto = e.target.value.toLowerCase();
-            resultsList.innerHTML = "";
-            if (texto.length < 2) {
-              resultsList.classList.add("d-none");
+        // ==========================================
+        //    PESTAÑA 1: CAPTURA INDIVIDUAL (KÁRDEX)
+        // ==========================================
+        const acadSearch = document.getElementById("acad-search");
+        const acadResults = document.getElementById("acad-results");
+        const acadWorkspace = document.getElementById("acad-workspace");
+        const acadAlumnoNombre = document.getElementById("acad-alumno-nombre");
+        const acadAlumnoControl = document.getElementById(
+          "acad-alumno-control",
+        );
+        const acadAlumnoStatus = document.getElementById("acad-alumno-status");
+
+        const acadPeriodo = document.getElementById("acad-periodo");
+        const acadMateria = document.getElementById("acad-materia");
+        const acadGrupo = document.getElementById("acad-grupo"); // Ahora es un select
+        const acadCalificacion = document.getElementById("acad-calificacion");
+        const formAcademico = document.getElementById("form-academico");
+        const kardexTableBody = document.getElementById("kardex-table-body");
+
+        let alumnoSeleccionado = null;
+
+        // Llenar selectores iniciales
+        acadPeriodo.innerHTML = '<option value="">Seleccione...</option>';
+        periodos.forEach(
+          (p) =>
+            (acadPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`),
+        );
+        acadMateria.innerHTML = '<option value="">Seleccione...</option>';
+        materias.forEach(
+          (m) =>
+            (acadMateria.innerHTML += `<option value="${m.id_materia}">${m.nombre_materia} (Sem ${m.semestre_ideal})</option>`),
+        );
+
+        // ¡NUEVA LÓGICA! Cargar grupos cuando se elige un periodo en Kárdex
+        if (acadPeriodo) {
+          acadPeriodo.addEventListener("change", async (e) => {
+            const id_periodo = e.target.value;
+            if (!id_periodo) {
+              acadGrupo.innerHTML =
+                '<option value="">Seleccione Periodo primero...</option>';
               return;
             }
-            const filtrados = todosLosAlumnos.filter(
-              (a) =>
-                a.nombre.toLowerCase().includes(texto) ||
-                a.apellido_paterno.toLowerCase().includes(texto) ||
-                a.numero_control.toLowerCase().includes(texto),
-            );
-            if (filtrados.length > 0) {
-              resultsList.classList.remove("d-none");
-              filtrados.slice(0, 5).forEach((alumno) => {
-                const item = document.createElement("button");
-                item.className =
-                  "list-group-item list-group-item-action list-group-item-dark";
-                item.innerHTML = `<strong class="text-primary">${alumno.numero_control}</strong> - ${alumno.nombre} ${alumno.apellido_paterno}`;
-                item.onclick = () => seleccionarAlumno(alumno);
-                resultsList.appendChild(item);
-              });
-            } else {
-              resultsList.classList.add("d-none");
+            acadGrupo.innerHTML = '<option value="">Cargando...</option>';
+            try {
+              const grupos = await window.electronAPI.invoke(
+                "get-grupos-por-periodo",
+                id_periodo,
+              );
+              acadGrupo.innerHTML =
+                '<option value="">Seleccione Grupo...</option>';
+              if (grupos.length === 0)
+                acadGrupo.innerHTML =
+                  '<option value="">No hay grupos creados</option>';
+              grupos.forEach(
+                (g) =>
+                  (acadGrupo.innerHTML += `<option value="${g.id_grupo}">${g.nombre_grupo}</option>`),
+              );
+            } catch (error) {
+              console.error(error);
             }
           });
         }
 
-        const seleccionarAlumno = async (alumno) => {
-          resultsList.classList.add("d-none");
-          searchInput.value = "";
-          workspace.classList.remove("d-none");
-          lblNombre.textContent = `${alumno.nombre} ${alumno.apellido_paterno} ${alumno.apellido_materno || ""}`;
-          lblControl.textContent = alumno.numero_control;
-          hiddenId.value = alumno.id_alumno;
-          await cargarKardex(alumno.id_alumno);
-        };
-
-        const cargarKardex = async (idAlumno) => {
-          tableKardex.innerHTML =
-            '<tr><td colspan="4" class="text-center">Cargando...</td></tr>';
-          try {
-            const historial = await window.electronAPI.invoke(
-              "get-kardex",
-              idAlumno,
-            );
-            tableKardex.innerHTML = "";
-            if (historial.length === 0) {
-              tableKardex.innerHTML =
-                '<tr><td colspan="4" class="text-center text-muted">Sin calificaciones</td></tr>';
+        // Buscador de alumnos (Igual que antes)
+        if (acadSearch) {
+          acadSearch.addEventListener("input", (e) => {
+            const val = e.target.value.toLowerCase().trim();
+            acadResults.innerHTML = "";
+            if (!val) {
+              acadResults.classList.add("d-none");
               return;
             }
-            historial.forEach((h) => {
-              const row = document.createElement("tr");
-              const colorCalif =
-                h.calificacion < 70
-                  ? "text-danger fw-bold"
-                  : "fw-bold text-success";
-              row.innerHTML = `
-              <td class="ps-4">${h.nombre_periodo}</td>
-              <td>${h.nombre_materia}</td>
-              <td class="${colorCalif} text-center">${h.calificacion}</td>
-              <td class="text-end pe-4">
-                <button class="btn btn-sm btn-outline-danger btn-borrar-calif border-0" data-id="${h.id_inscripcion}"><i class="bi bi-x-lg"></i></button>
-              </td>`;
-              tableKardex.appendChild(row);
-            });
-          } catch (e) {
-            console.error(e);
-          }
+
+            const filtrados = todosLosAlumnos
+              .filter(
+                (a) =>
+                  a.nombre.toLowerCase().includes(val) ||
+                  a.apellido_paterno.toLowerCase().includes(val) ||
+                  a.numero_control.includes(val),
+              )
+              .slice(0, 5);
+
+            if (filtrados.length > 0) {
+              acadResults.classList.remove("d-none");
+              filtrados.forEach((a) => {
+                const btn = document.createElement("button");
+                btn.className =
+                  "list-group-item list-group-item-action text-white bg-dark border-secondary";
+                btn.innerHTML = `<strong>${a.numero_control}</strong> - ${a.nombre} ${a.apellido_paterno}`;
+                btn.addEventListener("click", () =>
+                  seleccionarAlumnoIndividual(a),
+                );
+                acadResults.appendChild(btn);
+              });
+            } else {
+              acadResults.classList.add("d-none");
+            }
+          });
+        }
+
+        const seleccionarAlumnoIndividual = (alumno) => {
+          alumnoSeleccionado = alumno;
+          acadSearch.value = "";
+          acadResults.classList.add("d-none");
+
+          acadAlumnoNombre.textContent = `${alumno.nombre} ${alumno.apellido_paterno} ${alumno.apellido_materno || ""}`;
+          acadAlumnoControl.textContent = alumno.numero_control;
+          acadAlumnoStatus.textContent = alumno.status;
+          acadAlumnoStatus.className = `badge mt-2 ${alumno.status === "Activo" ? "bg-success" : "bg-danger"}`;
+
+          acadWorkspace.style.opacity = "1";
+          acadWorkspace.style.pointerEvents = "auto";
+
+          cargarKardex(alumno.id_alumno);
         };
 
-        if (formCalificacion) {
-          formCalificacion.addEventListener("submit", async (e) => {
+        const cargarKardex = async (id_alumno) => {
+          kardexTableBody.innerHTML =
+            '<tr><td colspan="6" class="text-center text-muted py-4">Historial en construcción...</td></tr>';
+        };
+
+        // Guardar captura individual con el ID del grupo oficial
+        if (formAcademico) {
+          formAcademico.addEventListener("submit", async (e) => {
             e.preventDefault();
-            const idAlumno = hiddenId.value;
-            const idMateria = hiddenMateriaId.value;
-            if (!idAlumno) return;
-            if (!idMateria) {
-              await window.electronAPI.invoke(
-                "dialog-alert",
-                "Materia no válida.",
-              );
-              return;
-            }
-            const datos = {
-              id_alumno: idAlumno,
-              id_periodo: selectPeriodo.value,
-              id_materia: idMateria,
-              calificacion: document.getElementById("acad-calificacion").value,
-            };
+            if (!alumnoSeleccionado) return;
+
+            const datos = [
+              {
+                id_alumno: alumnoSeleccionado.id_alumno,
+                id_periodo: acadPeriodo.value,
+                id_materia: acadMateria.value,
+                id_grupo_fk: acadGrupo.value, // Ahora pasamos el ID oficial del grupo
+                calificacion: acadCalificacion.value
+                  ? parseFloat(acadCalificacion.value)
+                  : null,
+                estado_forzado: null,
+              },
+            ];
+
             try {
               const res = await window.electronAPI.invoke(
-                "add-calificacion",
+                "save-calificaciones-masivas",
                 datos,
               );
               if (res.success) {
+                acadCalificacion.value = "";
                 await window.electronAPI.invoke(
                   "dialog-alert",
-                  "Calificación registrada.",
+                  "Calificación registrada correctamente.",
                 );
-                await cargarKardex(idAlumno);
-                document.getElementById("acad-calificacion").value = "";
-                inputMateriaBusqueda.value = "";
-                hiddenMateriaId.value = "";
-                inputMateriaBusqueda.focus();
+                cargarKardex(alumnoSeleccionado.id_alumno);
               }
             } catch (error) {
               await window.electronAPI.invoke(
@@ -998,31 +1168,320 @@
           });
         }
 
-        if (tableKardex) {
-          tableKardex.addEventListener("click", async (e) => {
-            const btn = e.target.closest(".btn-borrar-calif");
-            if (!btn) return;
-            if (
-              await window.electronAPI.invoke(
-                "dialog-confirm",
-                "¿Eliminar calificación?",
-              )
-            ) {
-              try {
-                await window.electronAPI.invoke(
-                  "delete-calificacion",
-                  btn.dataset.id,
-                );
-                await cargarKardex(hiddenId.value);
-              } catch (error) {
-                await window.electronAPI.invoke(
-                  "dialog-alert",
-                  "Error: " + error.message,
-                );
-              }
+        // ==========================================
+        //    PESTAÑA 2: SÁBANA GRUPAL
+        // ==========================================
+        const sabanaPeriodo = document.getElementById("sabana-periodo");
+        const sabanaMateria = document.getElementById("sabana-materia");
+        const sabanaGrupo = document.getElementById("sabana-grupo"); // Ahora es un select
+        const formSabana = document.getElementById("form-filtros-sabana");
+        const sabanaWorkspace = document.getElementById("sabana-workspace");
+        const sabanaTableBody = document.getElementById("sabana-table-body");
+        const sabanaTituloMateria = document.getElementById(
+          "sabana-titulo-materia",
+        );
+        const sabanaSubtitulo = document.getElementById("sabana-subtitulo");
+
+        let alumnosEnSabana = [];
+
+        sabanaPeriodo.innerHTML =
+          '<option value="">Seleccione Periodo...</option>';
+        periodos.forEach(
+          (p) =>
+            (sabanaPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`),
+        );
+        sabanaMateria.innerHTML =
+          '<option value="">Seleccione Materia...</option>';
+        materias.forEach(
+          (m) =>
+            (sabanaMateria.innerHTML += `<option value="${m.id_materia}">${m.nombre_materia}</option>`),
+        );
+
+        // ¡NUEVA LÓGICA! Cargar grupos cuando se elige un periodo en Sábana
+        if (sabanaPeriodo) {
+          sabanaPeriodo.addEventListener("change", async (e) => {
+            const id_periodo = e.target.value;
+            if (!id_periodo) {
+              sabanaGrupo.innerHTML =
+                '<option value="">Esperando Periodo...</option>';
+              return;
+            }
+            sabanaGrupo.innerHTML = '<option value="">Cargando...</option>';
+            try {
+              const grupos = await window.electronAPI.invoke(
+                "get-grupos-por-periodo",
+                id_periodo,
+              );
+              sabanaGrupo.innerHTML =
+                '<option value="">Seleccione Grupo...</option>';
+              if (grupos.length === 0)
+                sabanaGrupo.innerHTML =
+                  '<option value="">No hay grupos creados</option>';
+              grupos.forEach(
+                (g) =>
+                  (sabanaGrupo.innerHTML += `<option value="${g.id_grupo}">${g.nombre_grupo}</option>`),
+              );
+            } catch (error) {
+              console.error(error);
             }
           });
         }
+
+        // Cargar Lista
+        if (formSabana) {
+          formSabana.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const id_periodo = sabanaPeriodo.value;
+            const id_materia = sabanaMateria.value;
+            const id_grupo_fk = sabanaGrupo.value; // Ya obtenemos el ID correcto
+
+            // Obtenemos el texto visible para los títulos
+            const nombreMateria =
+              sabanaMateria.options[sabanaMateria.selectedIndex].text;
+            const nombrePeriodo =
+              sabanaPeriodo.options[sabanaPeriodo.selectedIndex].text;
+            const nombreGrupo =
+              sabanaGrupo.options[sabanaGrupo.selectedIndex].text;
+
+            sabanaTituloMateria.textContent = nombreMateria;
+            sabanaSubtitulo.textContent = `Grupo: ${nombreGrupo} | Periodo: ${nombrePeriodo}`;
+            sabanaWorkspace.classList.remove("d-none");
+
+            try {
+              sabanaTableBody.innerHTML =
+                '<tr><td colspan="5" class="text-center">Buscando alumnos...</td></tr>';
+              // Enviamos la petición con la estructura relacional nueva
+              alumnosEnSabana = await window.electronAPI.invoke(
+                "get-grupo-especifico",
+                { id_periodo, id_materia, id_grupo_fk },
+              );
+              renderizarSabana();
+            } catch (error) {
+              console.error(error);
+              sabanaTableBody.innerHTML =
+                '<tr><td colspan="5" class="text-center text-danger">Error al cargar.</td></tr>';
+            }
+          });
+        }
+
+        const renderizarSabana = () => {
+          sabanaTableBody.innerHTML = "";
+          if (alumnosEnSabana.length === 0) {
+            sabanaTableBody.innerHTML =
+              '<tr><td colspan="5" class="text-center text-muted py-4">Grupo vacío. Usa el botón "Añadir Alumno" para empezar a armar la lista.</td></tr>';
+            return;
+          }
+
+          alumnosEnSabana.forEach((a, index) => {
+            const tr = document.createElement("tr");
+            tr.dataset.id = a.id_alumno_fk || a.id_alumno;
+            tr.innerHTML = `
+              <td class="ps-4 fw-bold text-muted">${a.numero_control}</td>
+              <td class="fw-bold">${a.nombre} ${a.apellido_paterno}</td>
+              <td class="text-center">
+                <input type="number" class="form-control form-control-sm text-center fw-bold input-calif-sabana" 
+                       min="0" max="100" value="${a.calificacion !== null && a.calificacion !== undefined ? a.calificacion : ""}" 
+                       tabindex="${index + 1}" placeholder="--">
+              </td>
+              <td class="text-center">
+                <select class="form-select form-select-sm select-estado-sabana" tabindex="-1">
+                  <option value="Auto" selected>Automático</option>
+                  <option value="Baja">Marcar como Baja</option>
+                </select>
+              </td>
+              <td class="text-end pe-4">
+                <button type="button" class="btn btn-sm btn-outline-danger btn-quitar-sabana" tabindex="-1"><i class="bi bi-x-lg"></i></button>
+              </td>
+            `;
+            sabanaTableBody.appendChild(tr);
+          });
+
+          document.querySelectorAll(".btn-quitar-sabana").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+              const fila = e.target.closest("tr");
+              const id = fila.dataset.id;
+              alumnosEnSabana = alumnosEnSabana.filter(
+                (al) => (al.id_alumno_fk || al.id_alumno) != id,
+              );
+              renderizarSabana();
+            });
+          });
+        };
+
+        // Buscador Dinámico de Alumnos en Sábana (Sin Cambios)
+        document
+          .getElementById("btn-add-alumno-sabana")
+          .addEventListener("click", () => {
+            if (document.getElementById("sabana-search-container")) return;
+
+            const container = document.createElement("div");
+            container.id = "sabana-search-container";
+            container.className = "mt-3 position-relative w-100";
+
+            const inputBusqueda = document.createElement("input");
+            inputBusqueda.type = "text";
+            inputBusqueda.className =
+              "form-control form-control-sm border-success shadow";
+            inputBusqueda.placeholder =
+              "🔍 Escribe el nombre o N° de control... (Presiona ESC para cancelar)";
+
+            const resultsDiv = document.createElement("div");
+            resultsDiv.className =
+              "list-group shadow position-absolute w-100 start-0 mt-1 d-none";
+            resultsDiv.style.zIndex = "1050";
+
+            container.appendChild(inputBusqueda);
+            container.appendChild(resultsDiv);
+
+            const header = document.querySelector(
+              "#sabana-workspace .card-header",
+            );
+            header.appendChild(container);
+            inputBusqueda.focus();
+
+            inputBusqueda.addEventListener("input", (e) => {
+              const val = e.target.value.toLowerCase().trim();
+              resultsDiv.innerHTML = "";
+
+              if (!val) {
+                resultsDiv.classList.add("d-none");
+                return;
+              }
+
+              const filtrados = todosLosAlumnos
+                .filter(
+                  (a) =>
+                    a.nombre.toLowerCase().includes(val) ||
+                    a.apellido_paterno.toLowerCase().includes(val) ||
+                    a.numero_control.includes(val),
+                )
+                .slice(0, 5);
+
+              resultsDiv.classList.remove("d-none");
+
+              if (filtrados.length > 0) {
+                filtrados.forEach((a) => {
+                  const btn = document.createElement("button");
+                  btn.className =
+                    "list-group-item list-group-item-action text-white bg-dark border-secondary small py-2";
+                  btn.innerHTML = `<strong>${a.numero_control}</strong> - ${a.nombre} ${a.apellido_paterno}`;
+
+                  btn.addEventListener("click", () => {
+                    const yaExiste = alumnosEnSabana.some(
+                      (al) => (al.id_alumno_fk || al.id_alumno) === a.id_alumno,
+                    );
+
+                    if (!yaExiste) {
+                      alumnosEnSabana.push(a);
+                      renderizarSabana();
+                      container.remove();
+                    } else {
+                      inputBusqueda.value =
+                        "⚠️ Este alumno ya está en la lista";
+                      inputBusqueda.classList.replace(
+                        "border-success",
+                        "border-danger",
+                      );
+                      inputBusqueda.classList.add("text-danger");
+                      setTimeout(() => {
+                        inputBusqueda.value = val;
+                        inputBusqueda.classList.replace(
+                          "border-danger",
+                          "border-success",
+                        );
+                        inputBusqueda.classList.remove("text-danger");
+                        inputBusqueda.focus();
+                      }, 1500);
+                    }
+                  });
+                  resultsDiv.appendChild(btn);
+                });
+              } else {
+                resultsDiv.innerHTML =
+                  '<div class="list-group-item text-muted bg-dark small py-2">❌ No se encontró ningún alumno con esos datos.</div>';
+              }
+            });
+
+            inputBusqueda.addEventListener("keydown", (e) => {
+              if (e.key === "Escape") container.remove();
+            });
+          });
+
+        // Guardar Sábana completa
+        document
+          .getElementById("btn-guardar-sabana")
+          .addEventListener("click", async () => {
+            if (alumnosEnSabana.length === 0) return;
+
+            const id_periodo = sabanaPeriodo.value;
+            const id_materia = sabanaMateria.value;
+            const id_grupo_fk = sabanaGrupo.value; // Pasamos el ID del grupo oficial
+            const filas = sabanaTableBody.querySelectorAll("tr");
+
+            const arrayDatosMasivos = [];
+
+            filas.forEach((fila) => {
+              const califVal = fila.querySelector(".input-calif-sabana").value;
+              const estadoVal = fila.querySelector(
+                ".select-estado-sabana",
+              ).value;
+
+              arrayDatosMasivos.push({
+                id_alumno: fila.dataset.id,
+                id_materia: id_materia,
+                id_periodo: id_periodo,
+                id_grupo_fk: id_grupo_fk,
+                calificacion: califVal !== "" ? parseFloat(califVal) : null,
+                estado_forzado: estadoVal !== "Auto" ? estadoVal : null,
+              });
+            });
+
+            try {
+              const btn = document.getElementById("btn-guardar-sabana");
+              btn.innerHTML =
+                '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+              btn.disabled = true;
+
+              const res = await window.electronAPI.invoke(
+                "save-calificaciones-masivas",
+                arrayDatosMasivos,
+              );
+
+              if (res.success) {
+                btn.classList.replace("btn-success", "btn-primary");
+                btn.innerHTML =
+                  '<i class="bi bi-check2-all me-2"></i>¡Guardado! Listo para siguiente materia';
+
+                document
+                  .querySelectorAll(".input-calif-sabana")
+                  .forEach((input) => (input.value = ""));
+                sabanaMateria.focus();
+
+                setTimeout(() => {
+                  btn.classList.replace("btn-primary", "btn-success");
+                  btn.innerHTML =
+                    '<i class="bi bi-save me-2"></i> Guardar y Calificar Siguiente Materia';
+                  btn.disabled = false;
+                }, 2000);
+              }
+            } catch (error) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error al guardar: " + error.message,
+              );
+              document.getElementById("btn-guardar-sabana").disabled = false;
+              document.getElementById("btn-guardar-sabana").innerHTML =
+                '<i class="bi bi-save me-2"></i> Guardar y Calificar Siguiente Materia';
+            }
+          });
+
+        // Botón Cancelar
+        document
+          .getElementById("btn-limpiar-sabana")
+          .addEventListener("click", () => {
+            sabanaWorkspace.classList.add("d-none");
+            alumnosEnSabana = [];
+          });
       }
 
       // ==========================================

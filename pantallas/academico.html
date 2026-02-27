@@ -1,132 +1,293 @@
 <div class="workspace-container">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <h3 class="mb-0 fw-bold text-white">
-        <i class="bi bi-journal-bookmark-fill me-2"></i>Control Académico
-      </h3>
-    </div>
+  <div class="d-flex align-items-center mb-3">
+    <h3 class="mb-0 fw-bold text-white">
+      <i class="bi bi-journal-bookmark-fill me-2"></i>Control Académico
+    </h3>
   </div>
 
-  <div class="card shadow-sm border-0 mb-3">
-    <div class="card-body py-2">
-      <div class="input-group">
-        <span class="input-group-text bg-transparent border-0 text-muted"
-          ><i class="bi bi-search"></i
-        ></span>
-        <input
-          type="text"
-          class="form-control border-0 bg-transparent shadow-none"
-          id="acad-search"
-          placeholder="Buscar alumno por nombre o control..."
-          autocomplete="off"
-        />
-      </div>
-      <div
-        class="list-group mt-2 d-none shadow position-absolute w-100 start-0"
-        id="acad-results"
-        style="z-index: 1050; top: 100%"
-      ></div>
-    </div>
-  </div>
+  <ul class="nav nav-pills mb-3" id="acadTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link active"
+        id="individual-tab"
+        data-bs-toggle="pill"
+        data-bs-target="#panel-individual"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-person-badge me-2"></i>Captura Individual (Kárdex)
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="grupal-tab"
+        data-bs-toggle="pill"
+        data-bs-target="#panel-grupal"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-table me-2"></i>Captura Grupal (Sábana)
+      </button>
+    </li>
+  </ul>
 
-  <div id="acad-workspace" class="d-none panel-fill">
+  <div class="tab-content panel-fill" id="acadTabsContent">
     <div
-      class="card border-0 mb-3 bg-opacity-10 bg-primary"
-      style="
-        background-color: rgba(67, 97, 238, 0.05) !important;
-        border: 1px solid rgba(67, 97, 238, 0.2) !important;
-      "
+      class="tab-pane fade show active h-100"
+      id="panel-individual"
+      role="tabpanel"
     >
-      <div class="card-body py-2 d-flex align-items-center">
-        <div
-          class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white me-3"
-          style="width: 40px; height: 40px"
-        >
-          <i class="bi bi-person-fill fs-5"></i>
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body py-2">
+          <div class="input-group">
+            <span class="input-group-text bg-transparent border-0 text-muted"
+              ><i class="bi bi-search"></i
+            ></span>
+            <input
+              type="text"
+              class="form-control border-0 bg-transparent shadow-none"
+              id="acad-search"
+              placeholder="Buscar alumno por nombre o control..."
+              autocomplete="off"
+            />
+          </div>
+          <div
+            class="list-group mt-2 d-none shadow position-absolute w-100 start-0"
+            id="acad-results"
+            style="z-index: 1050; top: 100%"
+          ></div>
         </div>
-        <div>
-          <h5 class="mb-0 fw-bold text-white" id="lbl-alumno-nombre">
-            Nombre del Alumno
-          </h5>
-          <span class="text-primary small fw-bold" id="lbl-alumno-control"
-            >N° Control</span
-          >
+      </div>
+
+      <div
+        id="acad-workspace"
+        class="h-100"
+        style="opacity: 0.6; pointer-events: none"
+      >
+        <div class="row h-100 g-3 pb-3">
+          <div class="col-md-4 col-xl-3 d-flex flex-column">
+            <div
+              class="card border-0 mb-3 bg-opacity-10 bg-primary"
+              style="background-color: rgba(67, 97, 238, 0.05)"
+            >
+              <div class="card-body">
+                <h5
+                  class="card-title text-primary fw-bold mb-1"
+                  id="acad-alumno-nombre"
+                >
+                  Esperando alumno...
+                </h5>
+                <p class="card-text small text-muted mb-0">
+                  <i class="bi bi-hash"></i>
+                  <span id="acad-alumno-control">---</span>
+                </p>
+                <span class="badge bg-secondary mt-2" id="acad-alumno-status"
+                  >Sin selección</span
+                >
+              </div>
+            </div>
+
+            <div class="card h-100 border-0 d-flex flex-column">
+              <div class="card-header border-0 pb-1">
+                <span class="text-uppercase small text-muted fw-bold"
+                  >Registrar Calificación</span
+                >
+              </div>
+              <div class="card-body pt-2">
+                <form id="form-academico">
+                  <div class="mb-2">
+                    <label class="form-label text-muted small mb-0"
+                      >Periodo Escolar</label
+                    >
+                    <select
+                      id="acad-periodo"
+                      class="form-select form-select-sm"
+                      required
+                    >
+                      <option value="">Seleccione...</option>
+                    </select>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label text-muted small mb-0"
+                      >Materia</label
+                    >
+                    <select
+                      id="acad-materia"
+                      class="form-select form-select-sm"
+                      required
+                    >
+                      <option value="">Seleccione...</option>
+                    </select>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label text-muted small mb-0"
+                      >Grupo</label
+                    >
+                    <select
+                      id="acad-grupo"
+                      class="form-select form-select-sm"
+                      required
+                    >
+                      <option value="">Seleccione Periodo primero...</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label text-muted small mb-0"
+                      >Calificación Final</label
+                    >
+                    <input
+                      type="number"
+                      id="acad-calificacion"
+                      class="form-control text-center text-white fw-bold"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                  <button type="submit" class="btn btn-primary w-100 shadow">
+                    <i class="bi bi-check-lg"></i> Registrar
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-8 col-xl-9 d-flex flex-column">
+            <div class="card h-100 border-0 panel-fill">
+              <div class="card-header border-0">
+                <span class="text-uppercase small text-muted fw-bold"
+                  >Historial (Kárdex)</span
+                >
+              </div>
+              <div class="scroll-container">
+                <table class="table table-hover align-middle">
+                  <thead>
+                    <tr>
+                      <th class="ps-4">Periodo</th>
+                      <th>Materia</th>
+                      <th>Grupo</th>
+                      <th class="text-center">Calif.</th>
+                      <th class="text-center">Estado</th>
+                      <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="kardex-table-body">
+                    <tr>
+                      <td colspan="6" class="text-center text-muted py-4">
+                        Busca un alumno para ver su historial
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
-        <input type="hidden" id="selected-alumno-id" />
       </div>
     </div>
 
-    <div class="row h-100 g-3 pb-3">
-      <div class="col-md-4 col-xl-3">
-        <div class="card h-100 border-0">
-          <div class="card-header border-0">
-            <span class="text-uppercase small text-muted fw-bold"
-              >Registrar Calificación</span
-            >
-          </div>
-          <div class="card-body">
-            <form id="form-calificacion">
-              <div class="mb-3">
-                <label class="form-label text-muted small">Periodo</label>
-                <select id="acad-periodo" class="form-select" required></select>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label text-muted small">Materia</label>
-                <input
-                  class="form-control"
-                  list="datalistOptions"
-                  id="acad-materia-input"
-                  placeholder="Buscar asignatura..."
-                  required
-                  autocomplete="off"
-                />
-                <datalist id="datalistOptions"></datalist>
-                <input type="hidden" id="acad-materia-id" />
-              </div>
-
-              <div class="mb-4">
-                <label class="form-label text-muted small"
-                  >Calificación Final</label
-                >
-                <input
-                  type="number"
-                  id="acad-calificacion"
-                  class="form-control fs-4 fw-bold text-center text-white"
-                  min="0"
-                  max="100"
-                  required
-                />
-              </div>
-
-              <button type="submit" class="btn btn-primary w-100 btn-lg shadow">
-                <i class="bi bi-check-lg"></i> Registrar
+    <div class="tab-pane fade h-100" id="panel-grupal" role="tabpanel">
+      <div class="card shadow-sm border-0 mb-3 bg-dark">
+        <div class="card-body py-3">
+          <form id="form-filtros-sabana" class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label text-muted small mb-1">Periodo</label>
+              <select
+                id="sabana-periodo"
+                class="form-select form-select-sm"
+                required
+              >
+                <option value="">Cargando...</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-muted small mb-1"
+                >Materia Actual</label
+              >
+              <select
+                id="sabana-materia"
+                class="form-select form-select-sm"
+                required
+              >
+                <option value="">Cargando...</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label text-muted small mb-1">Grupo</label>
+              <select
+                id="sabana-grupo"
+                class="form-select form-select-sm"
+                required
+              >
+                <option value="">Esperando Periodo...</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="bi bi-cloud-download me-1"></i> Cargar Lista
               </button>
-            </form>
-          </div>
+            </div>
+          </form>
         </div>
       </div>
 
-      <div class="col-md-8 col-xl-9">
-        <div class="card h-100 border-0 panel-fill">
-          <div class="card-header border-0">
-            <span class="text-uppercase small text-muted fw-bold"
-              >Historial (Kardex)</span
+      <div
+        id="sabana-workspace"
+        class="card shadow-sm border-0 panel-fill d-none"
+      >
+        <div
+          class="card-header border-0 d-flex justify-content-between align-items-center bg-transparent pt-3 pb-2"
+        >
+          <div>
+            <h5 class="mb-0 text-white fw-bold" id="sabana-titulo-materia">
+              Nombre de la Materia
+            </h5>
+            <small class="text-muted" id="sabana-subtitulo"
+              >Grupo: -- | Periodo: --</small
             >
           </div>
-          <div class="scroll-container">
-            <table class="table table-hover align-middle">
-              <thead>
-                <tr>
-                  <th class="ps-4">Periodo</th>
-                  <th>Materia</th>
-                  <th class="text-center">Calif.</th>
-                  <th class="text-end pe-4">Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="kardex-table-body"></tbody>
-            </table>
-          </div>
+          <button
+            class="btn btn-sm btn-outline-success"
+            id="btn-add-alumno-sabana"
+          >
+            <i class="bi bi-person-plus"></i> Añadir Alumno al Grupo
+          </button>
+        </div>
+
+        <div class="scroll-container border-top border-dark">
+          <table class="table table-hover align-middle mb-0">
+            <thead
+              class="bg-dark"
+              style="position: sticky; top: 0; z-index: 10"
+            >
+              <tr>
+                <th class="ps-4" style="width: 15%">N° Control</th>
+                <th style="width: 40%">Alumno</th>
+                <th class="text-center" style="width: 15%">Calificación</th>
+                <th class="text-center" style="width: 15%">Estado (Forzado)</th>
+                <th class="text-end pe-4" style="width: 15%">Quitar</th>
+              </tr>
+            </thead>
+            <tbody id="sabana-table-body"></tbody>
+          </table>
+        </div>
+
+        <div class="card-footer border-0 bg-dark text-end p-3">
+          <button
+            type="button"
+            class="btn btn-secondary me-2"
+            id="btn-limpiar-sabana"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn btn-success px-4"
+            id="btn-guardar-sabana"
+          >
+            <i class="bi bi-save me-2"></i> Guardar y Calificar Siguiente
+            Materia
+          </button>
         </div>
       </div>
     </div>

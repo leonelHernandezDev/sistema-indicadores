@@ -30,6 +30,18 @@
         <i class="bi bi-book me-2"></i>Materias y Asignaturas
       </button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="grupos-tab"
+        data-bs-toggle="pill"
+        data-bs-target="#panel-grupos"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-people-fill me-2"></i>Gestión de Grupos
+      </button>
+    </li>
   </ul>
 
   <div class="tab-content panel-fill" id="configTabsContent">
@@ -64,15 +76,9 @@
                   <i class="bi bi-plus-lg"></i> Agregar
                 </button>
               </form>
-              <div class="alert alert-dark mt-4 small text-muted border-0">
-                <i class="bi bi-info-circle me-1"></i>
-                Usa el formato <strong>Año-Semestre</strong>. <br />Ejemplo:
-                2024-2.
-              </div>
             </div>
           </div>
         </div>
-
         <div class="col-md-8 col-xl-9">
           <div class="card h-100 border-0 panel-fill">
             <div class="card-header border-0 d-flex justify-content-between">
@@ -154,7 +160,6 @@
             </div>
           </div>
         </div>
-
         <div class="col-md-8 col-xl-9">
           <div class="card h-100 border-0 panel-fill">
             <div class="card-header border-0 d-flex justify-content-between">
@@ -173,6 +178,73 @@
                   </tr>
                 </thead>
                 <tbody id="materias-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade h-100" id="panel-grupos" role="tabpanel">
+      <div class="row h-100 g-3">
+        <div class="col-md-4 col-xl-3">
+          <div class="card h-100 border-0">
+            <div class="card-header border-0">
+              <span class="text-uppercase small text-muted fw-bold"
+                >Crear Grupo</span
+              >
+            </div>
+            <div class="card-body">
+              <form id="form-grupo">
+                <div class="mb-3">
+                  <label class="form-label text-muted small"
+                    >Periodo Escolar</label
+                  >
+                  <select class="form-select" id="grupo_periodo" required>
+                    <option value="">Cargando...</option>
+                  </select>
+                </div>
+                <div class="mb-4">
+                  <label class="form-label text-muted small"
+                    >Nombre del Grupo</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control text-uppercase"
+                    id="nombre_grupo"
+                    placeholder="Ej: 381"
+                    required
+                  />
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                  <i class="bi bi-plus-lg"></i> Agregar Grupo
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-8 col-xl-9">
+          <div class="card h-100 border-0 panel-fill">
+            <div class="card-header border-0 d-flex justify-content-between">
+              <span class="text-uppercase small text-muted fw-bold"
+                >Catálogo Oficial de Grupos</span
+              >
+            </div>
+            <div class="scroll-container">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th class="ps-4">Nombre del Grupo</th>
+                    <th class="text-end pe-4">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="grupos-table-body">
+                  <tr>
+                    <td colspan="2" class="text-center text-muted py-4">
+                      Selecciona un periodo a la izquierda para ver sus grupos
+                    </td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </div>
