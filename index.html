@@ -435,10 +435,10 @@
           formPeriodo.addEventListener("submit", async (e) => {
             e.preventDefault();
             const nombre = inputNombrePeriodo.value.trim().toUpperCase();
-            if (!/^\d{4}-[1-2]$/.test(nombre)) {
+            if (!/^\d{4}-[1-3]$/.test(nombre)) {
               await window.electronAPI.invoke(
                 "dialog-alert",
-                "Formato inválido. Usa AAAA-P (Ej: 2025-1)",
+                "Formato inválido. Usa AAAA-P (Ej: 2026-1 para Normal, 2026-3 para Intersemestral)",
               );
               return;
             }
@@ -1020,12 +1020,17 @@
 
         const acadPeriodo = document.getElementById("acad-periodo");
         const acadMateria = document.getElementById("acad-materia");
-        const acadGrupo = document.getElementById("acad-grupo"); // Ahora es un select
+        const acadGrupo = document.getElementById("acad-grupo");
         const acadCalificacion = document.getElementById("acad-calificacion");
         const formAcademico = document.getElementById("form-academico");
         const kardexTableBody = document.getElementById("kardex-table-body");
 
+        // ¡NUEVAS VARIABLES PARA CONTROLAR LA EDICIÓN!
         let alumnoSeleccionado = null;
+        let idInscripcionAEditar = null;
+        const btnGuardarKardex = formAcademico
+          ? formAcademico.querySelector('button[type="submit"]')
+          : null;
 
         // Llenar selectores iniciales
         acadPeriodo.innerHTML = '<option value="">Seleccione...</option>';
@@ -1039,7 +1044,6 @@
             (acadMateria.innerHTML += `<option value="${m.id_materia}">${m.nombre_materia} (Sem ${m.semestre_ideal})</option>`),
         );
 
-        // ¡NUEVA LÓGICA! Cargar grupos cuando se elige un periodo en Kárdex
         if (acadPeriodo) {
           acadPeriodo.addEventListener("change", async (e) => {
             const id_periodo = e.target.value;
@@ -1069,7 +1073,6 @@
           });
         }
 
-        // Buscador de alumnos (Igual que antes)
         if (acadSearch) {
           acadSearch.addEventListener("input", (e) => {
             const val = e.target.value.toLowerCase().trim();
@@ -1119,46 +1122,275 @@
           acadWorkspace.style.opacity = "1";
           acadWorkspace.style.pointerEvents = "auto";
 
+          // Si cambiamos de alumno, cancelamos cualquier edición que estuviera a medias
+          formAcademico.reset();
+          idInscripcionAEditar = null;
+          if (btnGuardarKardex) {
+            btnGuardarKardex.innerHTML =
+              '<i class="bi bi-check-lg"></i> Registrar';
+            btnGuardarKardex.classList.replace("btn-warning", "btn-primary");
+          }
+
           cargarKardex(alumno.id_alumno);
         };
 
         const cargarKardex = async (id_alumno) => {
           kardexTableBody.innerHTML =
-            '<tr><td colspan="6" class="text-center text-muted py-4">Historial en construcción...</td></tr>';
+            '<tr><td colspan="6" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Cargando historial...</td></tr>';
+
+          try {
+            const historial = await window.electronAPI.invoke(
+              "get-historial-alumno",
+              id_alumno,
+            );
+            kardexTableBody.innerHTML = "";
+
+            if (historial.length === 0) {
+              kardexTableBody.innerHTML =
+                '<tr><td colspan="6" class="text-center text-muted py-4">Este alumno aún no tiene calificaciones registradas.</td></tr>';
+              return;
+            }
+
+            // 1. AUTO-DETECCIÓN DE RECURSES (Inteligencia de Negocio)
+            const conteoIntentos = {};
+            historial.forEach((reg) => {
+              if (!conteoIntentos[reg.id_materia_fk])
+                conteoIntentos[reg.id_materia_fk] = 0;
+              conteoIntentos[reg.id_materia_fk]++;
+              reg.numero_intento = conteoIntentos[reg.id_materia_fk];
+            });
+
+            // Invertimos el arreglo para mostrar los más recientes arriba
+            const historialDesc = historial.reverse();
+
+            historialDesc.forEach((reg) => {
+              const row = document.createElement("tr");
+
+              // Colores de estado
+              let badgeClass = "bg-secondary";
+              if (reg.estado_materia === "Aprobada") badgeClass = "bg-success";
+              else if (reg.estado_materia === "Reprobada")
+                badgeClass = "bg-danger";
+              else if (reg.estado_materia === "Cursando")
+                badgeClass = "bg-warning text-dark";
+
+              let colorCalificacion =
+                reg.calificacion_final !== null && reg.calificacion_final < 70
+                  ? "text-danger"
+                  : "text-white";
+              const califMostrar =
+                reg.calificacion_final !== null ? reg.calificacion_final : "--";
+
+              // Etiqueta de Acreditación (CN, SO, CI) y Recurse
+              let etiquetaAcreditacion = `<span class="badge border border-secondary text-muted ms-1">${reg.tipo_acreditacion || "CN"}</span>`;
+              if (reg.numero_intento === 2)
+                etiquetaAcreditacion += `<span class="badge bg-danger ms-1 opacity-75">RECURSE</span>`;
+              if (reg.numero_intento >= 3)
+                etiquetaAcreditacion += `<span class="badge bg-danger ms-1">ESPECIAL</span>`;
+
+              // ¿Tiene competencias capturadas?
+              const tieneParciales =
+                reg.c1 !== null ||
+                reg.c2 !== null ||
+                reg.c3 !== null ||
+                reg.c4 !== null;
+              const idCollapse = `collapse-${reg.id_inscripcion}`;
+              const btnExpandir = tieneParciales
+                ? `<button class="btn btn-sm btn-link text-info p-0 me-2" data-bs-toggle="collapse" data-bs-target="#${idCollapse}"><i class="bi bi-plus-square"></i></button>`
+                : `<span class="d-inline-block me-4" style="width:16px;"></span>`; // Espacio vacío para alinear
+
+              row.innerHTML = `
+                <td class="ps-4 text-muted small">${reg.nombre_periodo}</td>
+                <td class="fw-bold">
+                  ${btnExpandir}
+                  ${reg.nombre_materia} <br>
+                  <span class="badge bg-light text-dark border fw-normal mt-1 ms-4">Semestre ${reg.semestre_ideal} • ${reg.creditos} Créditos</span>
+                  ${etiquetaAcreditacion}
+                </td>
+                <td class="text-muted">${reg.nombre_grupo}</td>
+                <td class="text-center fw-bold fs-5 ${colorCalificacion}">${califMostrar}</td>
+                <td class="text-center"><span class="badge ${badgeClass}">${reg.estado_materia}</span></td>
+                <td class="text-end pe-4">
+                  <button class="btn btn-sm btn-outline-danger btn-borrar-inscripcion border-0" data-id="${reg.id_inscripcion}" title="Eliminar registro">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              `;
+              kardexTableBody.appendChild(row);
+
+              // Si tiene parciales, inyectamos la fila oculta (Acordeón)
+              if (tieneParciales) {
+                const rowDetalle = document.createElement("tr");
+                rowDetalle.className = "collapse bg-dark bg-opacity-50";
+                rowDetalle.id = idCollapse;
+
+                let desglose = `<div class="d-flex gap-3 justify-content-center py-2 text-muted small font-monospace">`;
+                for (let i = 1; i <= 8; i++) {
+                  const c = reg[`c${i}`];
+                  if (c !== null) {
+                    const color = c < 70 ? "text-danger fw-bold" : "text-info";
+                    desglose += `<span>C${i}: <span class="${color}">${c}</span></span>`;
+                  }
+                }
+                desglose += `</div>`;
+
+                rowDetalle.innerHTML = `<td colspan="6" class="p-0 border-0">${desglose}</td>`;
+                kardexTableBody.appendChild(rowDetalle);
+              }
+            });
+          } catch (error) {
+            console.error(error);
+            kardexTableBody.innerHTML =
+              '<tr><td colspan="6" class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar el historial.</td></tr>';
+          }
         };
 
-        // Guardar captura individual con el ID del grupo oficial
+        // ESCUCHADOR DE CLICS EN LA TABLA (EDITAR Y BORRAR)
+        if (kardexTableBody) {
+          kardexTableBody.addEventListener("click", async (e) => {
+            // Lógica: Clic en EDITAR
+            const btnEditar = e.target.closest(".btn-editar-inscripcion");
+            if (btnEditar) {
+              idInscripcionAEditar = btnEditar.dataset.id;
+              acadPeriodo.value = btnEditar.dataset.periodo;
+              acadMateria.value = btnEditar.dataset.materia;
+
+              // Como acadGrupo depende de acadPeriodo, lo cargamos "a mano"
+              acadGrupo.innerHTML = '<option value="">Cargando...</option>';
+              try {
+                const grupos = await window.electronAPI.invoke(
+                  "get-grupos-por-periodo",
+                  btnEditar.dataset.periodo,
+                );
+                acadGrupo.innerHTML =
+                  '<option value="">Seleccione Grupo...</option>';
+                grupos.forEach((g) => {
+                  const selected =
+                    g.id_grupo == btnEditar.dataset.grupo ? "selected" : "";
+                  acadGrupo.innerHTML += `<option value="${g.id_grupo}" ${selected}>${g.nombre_grupo}</option>`;
+                });
+              } catch (error) {
+                console.error(error);
+              }
+
+              acadCalificacion.value = btnEditar.dataset.calif;
+
+              // Cambiar aspecto del botón principal
+              if (btnGuardarKardex) {
+                btnGuardarKardex.innerHTML =
+                  '<i class="bi bi-pencil-square me-2"></i> Actualizar';
+                btnGuardarKardex.classList.replace(
+                  "btn-primary",
+                  "btn-warning",
+                );
+              }
+              acadCalificacion.focus();
+              return;
+            }
+
+            // Lógica: Clic en BORRAR
+            const btnBorrar = e.target.closest(".btn-borrar-inscripcion");
+            if (btnBorrar) {
+              if (
+                await window.electronAPI.invoke(
+                  "dialog-confirm",
+                  "¿Estás seguro de eliminar esta calificación del historial?",
+                )
+              ) {
+                try {
+                  await window.electronAPI.invoke(
+                    "delete-inscripcion",
+                    btnBorrar.dataset.id,
+                  );
+
+                  // Si el usuario borra la materia que justo estaba editando, limpiamos el formulario para evitar errores
+                  if (idInscripcionAEditar == btnBorrar.dataset.id) {
+                    formAcademico.reset();
+                    idInscripcionAEditar = null;
+                    if (btnGuardarKardex) {
+                      btnGuardarKardex.innerHTML =
+                        '<i class="bi bi-check-lg"></i> Registrar';
+                      btnGuardarKardex.classList.replace(
+                        "btn-warning",
+                        "btn-primary",
+                      );
+                    }
+                  }
+                  if (alumnoSeleccionado)
+                    cargarKardex(alumnoSeleccionado.id_alumno);
+                } catch (error) {
+                  await window.electronAPI.invoke(
+                    "dialog-alert",
+                    "Error al eliminar: " + error.message,
+                  );
+                }
+              }
+            }
+          });
+        }
+
+        // GUARDAR O ACTUALIZAR (SUBMIT DEL FORMULARIO)
         if (formAcademico) {
           formAcademico.addEventListener("submit", async (e) => {
             e.preventDefault();
             if (!alumnoSeleccionado) return;
 
-            const datos = [
-              {
-                id_alumno: alumnoSeleccionado.id_alumno,
-                id_periodo: acadPeriodo.value,
-                id_materia: acadMateria.value,
-                id_grupo_fk: acadGrupo.value, // Ahora pasamos el ID oficial del grupo
-                calificacion: acadCalificacion.value
-                  ? parseFloat(acadCalificacion.value)
-                  : null,
-                estado_forzado: null,
-              },
-            ];
+            const califNum = acadCalificacion.value
+              ? parseFloat(acadCalificacion.value)
+              : null;
+            let estado = "Cursando";
+            if (califNum !== null)
+              estado = califNum >= 70 ? "Aprobada" : "Reprobada";
 
             try {
-              const res = await window.electronAPI.invoke(
-                "save-calificaciones-masivas",
-                datos,
-              );
-              if (res.success) {
-                acadCalificacion.value = "";
+              if (idInscripcionAEditar) {
+                // MODO EDICIÓN INDIVIDUAL
+                await window.electronAPI.invoke("update-inscripcion", {
+                  id_inscripcion: idInscripcionAEditar,
+                  id_periodo_fk: acadPeriodo.value,
+                  id_materia_fk: acadMateria.value,
+                  id_grupo_fk: acadGrupo.value,
+                  calificacion_final: califNum, // Campo de la nueva base de datos
+                  estado_materia: estado,
+                });
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "Registro actualizado correctamente.",
+                );
+
+                // Restaurar formulario
+                idInscripcionAEditar = null;
+                if (btnGuardarKardex) {
+                  btnGuardarKardex.innerHTML =
+                    '<i class="bi bi-check-lg"></i> Registrar';
+                  btnGuardarKardex.classList.replace(
+                    "btn-warning",
+                    "btn-primary",
+                  );
+                }
+              } else {
+                // MODO CREACIÓN INDIVIDUAL
+                const datos = {
+                  id_alumno: alumnoSeleccionado.id_alumno,
+                  id_periodo: acadPeriodo.value,
+                  id_materia: acadMateria.value,
+                  id_grupo_fk: acadGrupo.value,
+                  calificacion_final: califNum, // Campo de la nueva base de datos
+                  estado_materia: estado,
+                };
+                // Usamos el canal seguro e individual, ¡No el masivo de la sábana!
+                await window.electronAPI.invoke(
+                  "add-inscripcion-individual",
+                  datos,
+                );
                 await window.electronAPI.invoke(
                   "dialog-alert",
                   "Calificación registrada correctamente.",
                 );
-                cargarKardex(alumnoSeleccionado.id_alumno);
               }
+
+              acadCalificacion.value = "";
+              cargarKardex(alumnoSeleccionado.id_alumno);
             } catch (error) {
               await window.electronAPI.invoke(
                 "dialog-alert",
@@ -1169,21 +1401,45 @@
         }
 
         // ==========================================
-        //    PESTAÑA 2: SÁBANA GRUPAL
+        //    PESTAÑA 2: SÁBANA GRUPAL (NUEVA LÓGICA DINÁMICA)
         // ==========================================
         const sabanaPeriodo = document.getElementById("sabana-periodo");
         const sabanaMateria = document.getElementById("sabana-materia");
-        const sabanaGrupo = document.getElementById("sabana-grupo"); // Ahora es un select
+        const sabanaGrupo = document.getElementById("sabana-grupo");
         const formSabana = document.getElementById("form-filtros-sabana");
+
+        const sabanaEmptyState = document.getElementById("sabana-empty-state");
         const sabanaWorkspace = document.getElementById("sabana-workspace");
-        const sabanaTableBody = document.getElementById("sabana-table-body");
+        const btnEmptyAddManual = document.getElementById(
+          "btn-empty-add-manual",
+        );
+
         const sabanaTituloMateria = document.getElementById(
           "sabana-titulo-materia",
         );
         const sabanaSubtitulo = document.getElementById("sabana-subtitulo");
 
-        let alumnosEnSabana = [];
+        const theadSabana = document.getElementById("sabana-table-head");
+        const tbodySabana = document.getElementById("sabana-table-body");
 
+        // Controles Dinámicos
+        const switchModalidad = document.getElementById("switch-modalidad");
+        const containerCompetencias = document.getElementById(
+          "container-competencias",
+        );
+        const selectNumCompetencias = document.getElementById(
+          "select-num-competencias",
+        );
+        const lblBtnGuardar = document.getElementById("lbl-btn-guardar");
+        const btnGuardarSabana = document.getElementById("btn-guardar-sabana");
+        const sabanaStatusGuardado = document.getElementById(
+          "sabana-status-guardado",
+        );
+
+        let alumnosEnSabana = [];
+        let esListaNueva = true;
+
+        // 1. Cargar Comboboxes iniciales
         sabanaPeriodo.innerHTML =
           '<option value="">Seleccione Periodo...</option>';
         periodos.forEach(
@@ -1194,10 +1450,9 @@
           '<option value="">Seleccione Materia...</option>';
         materias.forEach(
           (m) =>
-            (sabanaMateria.innerHTML += `<option value="${m.id_materia}">${m.nombre_materia}</option>`),
+            (sabanaMateria.innerHTML += `<option value="${m.id_materia}">${m.nombre_materia} (Sem ${m.semestre_ideal})</option>`),
         );
 
-        // ¡NUEVA LÓGICA! Cargar grupos cuando se elige un periodo en Sábana
         if (sabanaPeriodo) {
           sabanaPeriodo.addEventListener("change", async (e) => {
             const id_periodo = e.target.value;
@@ -1214,9 +1469,6 @@
               );
               sabanaGrupo.innerHTML =
                 '<option value="">Seleccione Grupo...</option>';
-              if (grupos.length === 0)
-                sabanaGrupo.innerHTML =
-                  '<option value="">No hay grupos creados</option>';
               grupos.forEach(
                 (g) =>
                   (sabanaGrupo.innerHTML += `<option value="${g.id_grupo}">${g.nombre_grupo}</option>`),
@@ -1227,88 +1479,444 @@
           });
         }
 
-        // Cargar Lista
+        // 2. Toggle Switch (Competencias vs Final)
+        switchModalidad.addEventListener("change", (e) => {
+          const isCompetencias = e.target.checked;
+          document.getElementById("lbl-modalidad").textContent = isCompetencias
+            ? "Captura por Competencias"
+            : "Captura Histórica (Final)";
+          if (isCompetencias) {
+            containerCompetencias.classList.remove("d-none");
+          } else {
+            containerCompetencias.classList.add("d-none");
+          }
+          renderizarSabanaDinamica(); // Redibujar tabla si cambian el switch
+        });
+
+        selectNumCompetencias.addEventListener("change", () =>
+          renderizarSabanaDinamica(),
+        );
+
+        // 3. Cargar Lista (Submit del Formulario Superior)
         if (formSabana) {
           formSabana.addEventListener("submit", async (e) => {
             e.preventDefault();
             const id_periodo = sabanaPeriodo.value;
             const id_materia = sabanaMateria.value;
-            const id_grupo_fk = sabanaGrupo.value; // Ya obtenemos el ID correcto
+            const id_grupo_fk = sabanaGrupo.value;
 
-            // Obtenemos el texto visible para los títulos
-            const nombreMateria =
+            sabanaTituloMateria.textContent =
               sabanaMateria.options[sabanaMateria.selectedIndex].text;
-            const nombrePeriodo =
-              sabanaPeriodo.options[sabanaPeriodo.selectedIndex].text;
-            const nombreGrupo =
-              sabanaGrupo.options[sabanaGrupo.selectedIndex].text;
-
-            sabanaTituloMateria.textContent = nombreMateria;
-            sabanaSubtitulo.textContent = `Grupo: ${nombreGrupo} | Periodo: ${nombrePeriodo}`;
-            sabanaWorkspace.classList.remove("d-none");
+            sabanaSubtitulo.textContent = `Grupo: ${sabanaGrupo.options[sabanaGrupo.selectedIndex].text} | Periodo: ${sabanaPeriodo.options[sabanaPeriodo.selectedIndex].text}`;
 
             try {
-              sabanaTableBody.innerHTML =
-                '<tr><td colspan="5" class="text-center">Buscando alumnos...</td></tr>';
-              // Enviamos la petición con la estructura relacional nueva
+              // Bloquear pantalla visualmente mientras carga
+              sabanaEmptyState.classList.add("d-none");
+              sabanaWorkspace.classList.add("d-none");
+
               alumnosEnSabana = await window.electronAPI.invoke(
                 "get-grupo-especifico",
                 { id_periodo, id_materia, id_grupo_fk },
               );
-              renderizarSabana();
+
+              if (alumnosEnSabana.length === 0) {
+                esListaNueva = true;
+                sabanaEmptyState.classList.remove("d-none");
+                sabanaEmptyState.classList.add("d-flex");
+              } else {
+                esListaNueva = false;
+                sabanaWorkspace.classList.remove("d-none");
+
+                // Inteligencia UX: Si el sistema detecta que los alumnos ya tienen captura en C1 o C2,
+                // activa el switch de competencias automáticamente.
+                const tieneCompetencias = alumnosEnSabana.some(
+                  (a) => a.c1 !== null || a.c2 !== null,
+                );
+                if (tieneCompetencias && !switchModalidad.checked) {
+                  switchModalidad.checked = true;
+                  switchModalidad.dispatchEvent(new Event("change"));
+                }
+                renderizarSabanaDinamica();
+              }
             } catch (error) {
               console.error(error);
-              sabanaTableBody.innerHTML =
-                '<tr><td colspan="5" class="text-center text-danger">Error al cargar.</td></tr>';
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error al cargar el grupo.",
+              );
             }
           });
         }
 
-        const renderizarSabana = () => {
-          sabanaTableBody.innerHTML = "";
+        // 4. Botón "Añadir Manualmente" desde el Empty State
+        btnEmptyAddManual.addEventListener("click", () => {
+          sabanaEmptyState.classList.add("d-none");
+          sabanaEmptyState.classList.remove("d-flex");
+          sabanaWorkspace.classList.remove("d-none");
+          esListaNueva = true;
+          renderizarSabanaDinamica();
+          document.getElementById("btn-add-alumno-sabana").click(); // Abrir buscador automáticamente
+        });
+
+        // ==========================================
+        // 4.5. MOTOR DE CLONACIÓN DE LISTAS
+        // ==========================================
+        const btnEmptyClonar = document.getElementById("btn-empty-clonar");
+        const clonePeriodo = document.getElementById("clone-periodo");
+        const cloneMateria = document.getElementById("clone-materia");
+        const cloneGrupo = document.getElementById("clone-grupo");
+        const clonePreview = document.getElementById("clone-preview");
+        const btnEjecutarClonacion = document.getElementById(
+          "btn-ejecutar-clonacion",
+        );
+        let modalClonar = null;
+        let alumnosAClonar = [];
+
+        if (btnEmptyClonar) {
+          btnEmptyClonar.addEventListener("click", () => {
+            if (!modalClonar)
+              modalClonar = new bootstrap.Modal(
+                document.getElementById("modalClonarLista"),
+              );
+
+            // Llenar los selects del modal usando los catálogos que ya tenemos en memoria
+            clonePeriodo.innerHTML = sabanaPeriodo.innerHTML;
+            cloneMateria.innerHTML = sabanaMateria.innerHTML;
+            cloneGrupo.innerHTML =
+              '<option value="">Seleccione Periodo...</option>';
+            clonePreview.classList.add("d-none");
+            btnEjecutarClonacion.disabled = true;
+
+            modalClonar.show();
+          });
+        }
+
+        // Cargar los grupos en el modal cuando eligen un periodo
+        if (clonePeriodo) {
+          clonePeriodo.addEventListener("change", async (e) => {
+            const id_periodo = e.target.value;
+            cloneGrupo.innerHTML = '<option value="">Cargando...</option>';
+            if (!id_periodo) return;
+            try {
+              const grupos = await window.electronAPI.invoke(
+                "get-grupos-por-periodo",
+                id_periodo,
+              );
+              cloneGrupo.innerHTML =
+                '<option value="">Seleccione Grupo...</option>';
+              grupos.forEach(
+                (g) =>
+                  (cloneGrupo.innerHTML += `<option value="${g.id_grupo}">${g.nombre_grupo}</option>`),
+              );
+            } catch (error) {
+              console.error(error);
+            }
+          });
+        }
+
+        // Verificar cuántos alumnos hay cada vez que cambian una opción en el modal
+        const checkClonePreview = async () => {
+          if (clonePeriodo.value && cloneMateria.value && cloneGrupo.value) {
+            clonePreview.classList.remove("d-none");
+            clonePreview.className =
+              "alert alert-secondary py-2 small mb-0 text-center border-0";
+            clonePreview.innerHTML =
+              '<span class="spinner-border spinner-border-sm me-2"></span> Buscando...';
+
+            alumnosAClonar = await window.electronAPI.invoke(
+              "get-grupo-especifico",
+              {
+                id_periodo: clonePeriodo.value,
+                id_materia: cloneMateria.value,
+                id_grupo_fk: cloneGrupo.value,
+              },
+            );
+
+            if (alumnosAClonar.length > 0) {
+              clonePreview.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> Se encontraron <strong class="fs-6">${alumnosAClonar.length}</strong> alumnos listos para importar.`;
+              clonePreview.className =
+                "alert bg-success bg-opacity-25 text-success py-2 small mb-0 text-center border-0";
+              btnEjecutarClonacion.disabled = false;
+            } else {
+              clonePreview.innerHTML =
+                "Este grupo está vacío. No hay a quién clonar.";
+              clonePreview.className =
+                "alert bg-warning bg-opacity-25 text-warning py-2 small mb-0 text-center border-0";
+              btnEjecutarClonacion.disabled = true;
+            }
+          }
+        };
+
+        clonePeriodo.addEventListener("change", checkClonePreview);
+        cloneMateria.addEventListener("change", checkClonePreview);
+        cloneGrupo.addEventListener("change", checkClonePreview);
+
+        // EJECUTAR LA CLONACIÓN
+        btnEjecutarClonacion.addEventListener("click", () => {
+          // El truco maestro: Mapeamos a los alumnos y "vaciamos" sus datos históricos
+          const nuevosAlumnosLimpios = alumnosAClonar.map((a) => {
+            return {
+              id_alumno_fk: a.id_alumno_fk || a.id_alumno,
+              numero_control: a.numero_control,
+              nombre: a.nombre,
+              apellido_paterno: a.apellido_paterno,
+              // DESTRUIMOS LA HISTORIA LOCAL PARA QUE SEAN REGISTROS NUEVOS
+              id_inscripcion: null,
+              c1: null,
+              c2: null,
+              c3: null,
+              c4: null,
+              c5: null,
+              c6: null,
+              c7: null,
+              c8: null,
+              calificacion_final: null,
+              estado_materia: "Cursando",
+              tipo_acreditacion: "CN",
+            };
+          });
+
+          alumnosEnSabana = nuevosAlumnosLimpios;
+          esListaNueva = true;
+
+          modalClonar.hide();
+
+          // Ocultar Empty State y Mostrar Área de Trabajo
+          sabanaEmptyState.classList.add("d-none");
+          sabanaEmptyState.classList.remove("d-flex");
+          sabanaWorkspace.classList.remove("d-none");
+
+          sabanaStatusGuardado.innerHTML =
+            '<span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle"></i> IMPORTANTE: Alumnos importados. Debes presionar "Guardar" para oficializar la lista.</span>';
+
+          renderizarSabanaDinamica();
+        });
+
+        // 5. Motor de Renderizado Dinámico
+        const renderizarSabanaDinamica = () => {
+          const isCompetencias = switchModalidad.checked;
+          const numComp = parseInt(selectNumCompetencias.value);
+
+          // --- A. DIBUJAR ENCABEZADOS (THEAD) ---
+          let theadHTML = `
+            <th class="ps-4" style="width: 12%">N° Control</th>
+            <th style="width: 25%">Alumno</th>
+          `;
+
+          if (isCompetencias) {
+            for (let i = 1; i <= numComp; i++) {
+              theadHTML += `<th class="text-center text-info" style="width: 6%">C${i}</th>`;
+            }
+          }
+
+          theadHTML += `
+            <th class="text-center text-warning" style="width: 10%">Prom. Final</th>
+            <th class="text-center" style="width: 12%">Acreditación</th>
+            <th class="text-center" style="width: 12%">Estatus</th>
+            <th class="text-end pe-4" style="width: 8%">Quitar</th>
+          `;
+          theadSabana.innerHTML = theadHTML;
+
+          // --- B. DIBUJAR ALUMNOS (TBODY) ---
+          tbodySabana.innerHTML = "";
+
+          // Comportamiento Camaleónico del Botón Guardar
+          if (alumnosEnSabana.length > 0 && !esListaNueva) {
+            btnGuardarSabana.classList.replace("btn-primary", "btn-warning");
+            lblBtnGuardar.innerHTML = "Actualizar Lista Modificada";
+          } else {
+            btnGuardarSabana.classList.replace("btn-warning", "btn-primary");
+            lblBtnGuardar.innerHTML = "Guardar Nueva Lista";
+          }
+
           if (alumnosEnSabana.length === 0) {
-            sabanaTableBody.innerHTML =
-              '<tr><td colspan="5" class="text-center text-muted py-4">Grupo vacío. Usa el botón "Añadir Alumno" para empezar a armar la lista.</td></tr>';
+            tbodySabana.innerHTML = `<tr><td colspan="15" class="text-center text-muted py-4">Añade alumnos para empezar a capturar...</td></tr>`;
             return;
           }
 
           alumnosEnSabana.forEach((a, index) => {
             const tr = document.createElement("tr");
-            tr.dataset.id = a.id_alumno_fk || a.id_alumno;
-            tr.innerHTML = `
+            const id_alumno_real = a.id_alumno_fk || a.id_alumno;
+            tr.dataset.id_alumno = id_alumno_real;
+            // Si el alumno viene de la BD y ya tiene calificación guardada, traemos su ID de inscripción para el Upsert
+            if (a.id_inscripcion) tr.dataset.id_inscripcion = a.id_inscripcion;
+
+            let rowHTML = `
               <td class="ps-4 fw-bold text-muted">${a.numero_control}</td>
               <td class="fw-bold">${a.nombre} ${a.apellido_paterno}</td>
+            `;
+
+            if (isCompetencias) {
+              for (let i = 1; i <= numComp; i++) {
+                const val =
+                  a[`c${i}`] !== null && a[`c${i}`] !== undefined
+                    ? a[`c${i}`]
+                    : "";
+                rowHTML += `
+                  <td class="text-center">
+                    <input type="number" class="form-control form-control-sm text-center fw-bold input-parcial bg-dark text-info border-secondary" 
+                           min="0" max="100" data-comp="c${i}" value="${val}" placeholder="--">
+                  </td>
+                `;
+              }
+            }
+
+            const califFinal =
+              a.calificacion_final !== null &&
+              a.calificacion_final !== undefined
+                ? a.calificacion_final
+                : "";
+            const readonlyAttr = isCompetencias ? "readonly" : "";
+            const bgClass = isCompetencias
+              ? "bg-secondary bg-opacity-25 border-0"
+              : "bg-dark border-warning";
+
+            // Regla visual: Si reprobó, pintar el texto de rojo
+            let finalColorClass =
+              califFinal !== "" && califFinal < 70
+                ? "text-danger"
+                : "text-white";
+
+            rowHTML += `
               <td class="text-center">
-                <input type="number" class="form-control form-control-sm text-center fw-bold input-calif-sabana" 
-                       min="0" max="100" value="${a.calificacion !== null && a.calificacion !== undefined ? a.calificacion : ""}" 
-                       tabindex="${index + 1}" placeholder="--">
+                <input type="text" class="form-control form-control-sm text-center fw-bold input-final ${bgClass} ${finalColorClass}" 
+                       ${readonlyAttr} value="${califFinal}" placeholder="--">
               </td>
               <td class="text-center">
-                <select class="form-select form-select-sm select-estado-sabana" tabindex="-1">
-                  <option value="Auto" selected>Automático</option>
-                  <option value="Baja">Marcar como Baja</option>
+                <select class="form-select form-select-sm select-acreditacion bg-dark text-white border-secondary">
+                  <option value="CN" ${a.tipo_acreditacion === "CN" || !a.tipo_acreditacion ? "selected" : ""}>CN (Normal)</option>
+                  <option value="SO" ${a.tipo_acreditacion === "SO" ? "selected" : ""}>SO (Segunda)</option>
+                  <option value="CI" ${a.tipo_acreditacion === "CI" ? "selected" : ""}>CI (Verano)</option>
+                </select>
+              </td>
+              <td class="text-center">
+                <select class="form-select form-select-sm select-estado bg-dark text-white border-secondary">
+                  <option value="Auto" ${a.estado_materia !== "Baja" ? "selected" : ""}>Automático</option>
+                  <option value="Baja" ${a.estado_materia === "Baja" ? "selected" : ""}>Baja</option>
                 </select>
               </td>
               <td class="text-end pe-4">
-                <button type="button" class="btn btn-sm btn-outline-danger btn-quitar-sabana" tabindex="-1"><i class="bi bi-x-lg"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-quitar-sabana border-0" title="Eliminar por error de captura">
+                  <i class="bi bi-trash"></i>
+                </button>
               </td>
             `;
-            sabanaTableBody.appendChild(tr);
+
+            tr.innerHTML = rowHTML;
+            tbodySabana.appendChild(tr);
           });
 
+          // --- C. LÓGICA DE CALCULADORA EN VIVO Y VALIDACIONES ---
+          const inputs = tbodySabana.querySelectorAll("input[type='number']");
+
+          inputs.forEach((input) => {
+            // Detalle Senior: Bloquear teclas no numéricas (e, +, -) y limitar el máximo a 100
+            input.addEventListener("keydown", (e) => {
+              if (["e", "E", "+", "-", "."].includes(e.key)) e.preventDefault();
+            });
+
+            input.addEventListener("input", (e) => {
+              let val = parseInt(e.target.value);
+              if (val > 100) e.target.value = 100;
+              if (val < 0) e.target.value = 0;
+
+              // Alerta visual de cambios sin guardar
+              sabanaStatusGuardado.innerHTML =
+                '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Cambios sin guardar</span>';
+
+              // Disparar cálculo automático
+              calcularPromedioFila(e.target.closest("tr"));
+            });
+          });
+
+          // Detalle UX: Navegación rápida con tecla Enter
+          inputs.forEach((input, index) => {
+            input.addEventListener("keypress", (e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                // Intentar bajar a la misma columna de la fila de abajo
+                const row = input.closest("tr");
+                const nextRow = row.nextElementSibling;
+                if (nextRow) {
+                  const indexInRow = Array.from(
+                    row.querySelectorAll("input"),
+                  ).indexOf(input);
+                  const nextInput =
+                    nextRow.querySelectorAll("input")[indexInRow];
+                  if (nextInput) nextInput.focus();
+                }
+              }
+            });
+          });
+
+          // Lógica del nuevo Bote de Basura Seguro
           document.querySelectorAll(".btn-quitar-sabana").forEach((btn) => {
-            btn.addEventListener("click", (e) => {
+            btn.addEventListener("click", async (e) => {
               const fila = e.target.closest("tr");
-              const id = fila.dataset.id;
-              alumnosEnSabana = alumnosEnSabana.filter(
-                (al) => (al.id_alumno_fk || al.id_alumno) != id,
-              );
-              renderizarSabana();
+              const id = fila.dataset.id_alumno;
+
+              if (
+                await window.electronAPI.invoke(
+                  "dialog-confirm",
+                  "⚠️ ¿Estás seguro de quitar a este alumno de la lista?\n\nSolo usa esto para ERRORES DE CAPTURA. Si el alumno abandonó la materia a mitad del curso, usa el menú 'Estatus' para marcarlo como Baja.",
+                )
+              ) {
+                alumnosEnSabana = alumnosEnSabana.filter(
+                  (al) => (al.id_alumno_fk || al.id_alumno) != id,
+                );
+                sabanaStatusGuardado.innerHTML =
+                  '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Cambios sin guardar (Alumno removido)</span>';
+                renderizarSabanaDinamica();
+              }
             });
           });
         };
 
-        // Buscador Dinámico de Alumnos en Sábana (Sin Cambios)
+        // 6. Calculadora de Promedio con Regla TecNM ("NA")
+        const calcularPromedioFila = (tr) => {
+          const isCompetencias = switchModalidad.checked;
+          const inputFinal = tr.querySelector(".input-final");
+
+          if (!isCompetencias) return; // Si es captura histórica (manual), no calculamos
+
+          const parciales = Array.from(tr.querySelectorAll(".input-parcial"));
+          let suma = 0;
+          let completadas = 0;
+          let reprobada = false;
+
+          parciales.forEach((p) => {
+            if (p.value !== "") {
+              const val = parseFloat(p.value);
+              suma += val;
+              completadas++;
+              if (val < 70) reprobada = true; // Aplicamos la regla TecNM
+
+              // Efecto visual en la celda del parcial
+              p.classList.remove("text-info", "text-danger");
+              p.classList.add(val < 70 ? "text-danger" : "text-info");
+            } else {
+              p.classList.remove("text-danger");
+              p.classList.add("text-info");
+            }
+          });
+
+          // Si hay al menos un número escrito...
+          if (completadas > 0) {
+            let promedio = Math.round(suma / completadas);
+            if (reprobada) {
+              inputFinal.value = "NA";
+              inputFinal.classList.replace("text-white", "text-danger");
+            } else {
+              inputFinal.value = promedio;
+              inputFinal.classList.replace("text-danger", "text-white");
+            }
+          } else {
+            inputFinal.value = "";
+            inputFinal.classList.replace("text-danger", "text-white");
+          }
+        };
+
+        // 7. Buscador Dinámico de Alumnos (Reutilizado del código anterior)
         document
           .getElementById("btn-add-alumno-sabana")
           .addEventListener("click", () => {
@@ -1323,7 +1931,7 @@
             inputBusqueda.className =
               "form-control form-control-sm border-success shadow";
             inputBusqueda.placeholder =
-              "🔍 Escribe el nombre o N° de control... (Presiona ESC para cancelar)";
+              "🔍 Escribe nombre o control... (ESC para cancelar)";
 
             const resultsDiv = document.createElement("div");
             resultsDiv.className =
@@ -1342,7 +1950,6 @@
             inputBusqueda.addEventListener("input", (e) => {
               const val = e.target.value.toLowerCase().trim();
               resultsDiv.innerHTML = "";
-
               if (!val) {
                 resultsDiv.classList.add("d-none");
                 return;
@@ -1356,7 +1963,6 @@
                     a.numero_control.includes(val),
                 )
                 .slice(0, 5);
-
               resultsDiv.classList.remove("d-none");
 
               if (filtrados.length > 0) {
@@ -1370,10 +1976,13 @@
                     const yaExiste = alumnosEnSabana.some(
                       (al) => (al.id_alumno_fk || al.id_alumno) === a.id_alumno,
                     );
-
                     if (!yaExiste) {
+                      // Agregar alumno nuevo a la vista
+                      a.id_alumno_fk = a.id_alumno;
                       alumnosEnSabana.push(a);
-                      renderizarSabana();
+                      sabanaStatusGuardado.innerHTML =
+                        '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Cambios sin guardar (Alumno nuevo)</span>';
+                      renderizarSabanaDinamica();
                       container.remove();
                     } else {
                       inputBusqueda.value =
@@ -1398,88 +2007,117 @@
                 });
               } else {
                 resultsDiv.innerHTML =
-                  '<div class="list-group-item text-muted bg-dark small py-2">❌ No se encontró ningún alumno con esos datos.</div>';
+                  '<div class="list-group-item text-muted bg-dark small py-2">❌ No se encontró.</div>';
               }
             });
-
             inputBusqueda.addEventListener("keydown", (e) => {
               if (e.key === "Escape") container.remove();
             });
           });
 
-        // Guardar Sábana completa
-        document
-          .getElementById("btn-guardar-sabana")
-          .addEventListener("click", async () => {
-            if (alumnosEnSabana.length === 0) return;
+        // 8. GUARDAR SÁBANA (Preparación del JSON para el UPSERT en main.js)
+        btnGuardarSabana.addEventListener("click", async () => {
+          if (alumnosEnSabana.length === 0) return;
 
-            const id_periodo = sabanaPeriodo.value;
-            const id_materia = sabanaMateria.value;
-            const id_grupo_fk = sabanaGrupo.value; // Pasamos el ID del grupo oficial
-            const filas = sabanaTableBody.querySelectorAll("tr");
+          // CORRECCIÓN: Parseamos a Entero para que el motor UPSERT de main.js los compare bien
+          const payload = {
+            id_periodo: parseInt(sabanaPeriodo.value),
+            id_materia: parseInt(sabanaMateria.value),
+            id_grupo: parseInt(sabanaGrupo.value),
+            alumnos: [],
+          };
 
-            const arrayDatosMasivos = [];
+          const filas = tbodySabana.querySelectorAll("tr");
 
-            filas.forEach((fila) => {
-              const califVal = fila.querySelector(".input-calif-sabana").value;
-              const estadoVal = fila.querySelector(
-                ".select-estado-sabana",
-              ).value;
+          filas.forEach((fila) => {
+            const isCompetencias = switchModalidad.checked;
+            const alumnoData = {
+              // Si existe el ID, lo convertimos a Número. Si no, va Nulo.
+              id_inscripcion: fila.dataset.id_inscripcion
+                ? parseInt(fila.dataset.id_inscripcion)
+                : null,
+              id_alumno_fk: parseInt(fila.dataset.id_alumno),
+              c1: null,
+              c2: null,
+              c3: null,
+              c4: null,
+              c5: null,
+              c6: null,
+              c7: null,
+              c8: null,
+              calificacion_final: null,
+              estado_materia: fila.querySelector(".select-estado").value,
+              tipo_acreditacion: fila.querySelector(".select-acreditacion")
+                .value,
+            };
 
-              arrayDatosMasivos.push({
-                id_alumno: fila.dataset.id,
-                id_materia: id_materia,
-                id_periodo: id_periodo,
-                id_grupo_fk: id_grupo_fk,
-                calificacion: califVal !== "" ? parseFloat(califVal) : null,
-                estado_forzado: estadoVal !== "Auto" ? estadoVal : null,
+            if (isCompetencias) {
+              const parciales = fila.querySelectorAll(".input-parcial");
+              parciales.forEach((p) => {
+                const compKey = p.dataset.comp;
+                if (p.value !== "") alumnoData[compKey] = parseFloat(p.value);
               });
-            });
-
-            try {
-              const btn = document.getElementById("btn-guardar-sabana");
-              btn.innerHTML =
-                '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
-              btn.disabled = true;
-
-              const res = await window.electronAPI.invoke(
-                "save-calificaciones-masivas",
-                arrayDatosMasivos,
-              );
-
-              if (res.success) {
-                btn.classList.replace("btn-success", "btn-primary");
-                btn.innerHTML =
-                  '<i class="bi bi-check2-all me-2"></i>¡Guardado! Listo para siguiente materia';
-
-                document
-                  .querySelectorAll(".input-calif-sabana")
-                  .forEach((input) => (input.value = ""));
-                sabanaMateria.focus();
-
-                setTimeout(() => {
-                  btn.classList.replace("btn-primary", "btn-success");
-                  btn.innerHTML =
-                    '<i class="bi bi-save me-2"></i> Guardar y Calificar Siguiente Materia';
-                  btn.disabled = false;
-                }, 2000);
-              }
-            } catch (error) {
-              await window.electronAPI.invoke(
-                "dialog-alert",
-                "Error al guardar: " + error.message,
-              );
-              document.getElementById("btn-guardar-sabana").disabled = false;
-              document.getElementById("btn-guardar-sabana").innerHTML =
-                '<i class="bi bi-save me-2"></i> Guardar y Calificar Siguiente Materia';
             }
+
+            const califFinalStr = fila.querySelector(".input-final").value;
+
+            if (califFinalStr === "NA") {
+              alumnoData.calificacion_final = 0;
+              if (alumnoData.estado_materia === "Auto")
+                alumnoData.estado_materia = "Reprobada";
+            } else if (califFinalStr !== "") {
+              alumnoData.calificacion_final = parseFloat(califFinalStr);
+              if (alumnoData.estado_materia === "Auto") {
+                alumnoData.estado_materia =
+                  alumnoData.calificacion_final >= 70
+                    ? "Aprobada"
+                    : "Reprobada";
+              }
+            }
+
+            payload.alumnos.push(alumnoData);
           });
 
-        // Botón Cancelar
+          try {
+            const originalHtml = btnGuardarSabana.innerHTML;
+            btnGuardarSabana.innerHTML =
+              '<span class="spinner-border spinner-border-sm me-2"></span>Sincronizando...';
+            btnGuardarSabana.disabled = true;
+
+            const res = await window.electronAPI.invoke(
+              "save-calificaciones-masivas",
+              payload,
+            );
+
+            if (res.success) {
+              btnGuardarSabana.classList.replace("btn-primary", "btn-success");
+              btnGuardarSabana.classList.replace("btn-warning", "btn-success");
+              btnGuardarSabana.innerHTML =
+                '<i class="bi bi-check2-all me-2"></i> ¡Lista Sincronizada!';
+              sabanaStatusGuardado.innerHTML =
+                '<span class="text-success"><i class="bi bi-cloud-check"></i> Base de datos actualizada</span>';
+
+              formSabana.dispatchEvent(new Event("submit"));
+
+              setTimeout(() => {
+                btnGuardarSabana.innerHTML = originalHtml;
+                btnGuardarSabana.disabled = false;
+              }, 2000);
+            }
+          } catch (error) {
+            await window.electronAPI.invoke(
+              "dialog-alert",
+              "Error al guardar: " + error.message,
+            );
+            btnGuardarSabana.disabled = false;
+          }
+        });
+        // 9. Botón Cerrar Lista
         document
           .getElementById("btn-limpiar-sabana")
           .addEventListener("click", () => {
             sabanaWorkspace.classList.add("d-none");
+            sabanaEmptyState.classList.add("d-none");
             alumnosEnSabana = [];
           });
       }

@@ -7,8 +7,18 @@ const bcrypt = require("bcryptjs");
 // --- Configuración de la Base de Datos ---
 // Definimos la ruta de la base de datos en la carpeta de datos del usuario
 const dbPath = path.join(app.getPath("userData"), "datos_academicos.sqlite");
-const db = new sqlite3.Database(dbPath);
-
+// Conectamos y ACTIVAMOS LAS LLAVES FORÁNEAS (Pilar 1)
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error("Error al conectar a la BD:", err.message);
+  } else {
+    db.run("PRAGMA foreign_keys = ON", (error) => {
+      if (error)
+        console.error("Error activando PRAGMA foreign_keys:", error.message);
+      else console.log("Seguridad de Llaves Foráneas (PRAGMA) ACTIVADA.");
+    });
+  }
+});
 // Función global para la ventana principal
 let mainWindow;
 
@@ -25,7 +35,7 @@ function setupDatabase() {
       password_hash TEXT NOT NULL
     )`);
 
-    // 2. Tabla Alumnos
+    // 2. Tabla Alumnos (Con RESTRICT en el Periodo de Ingreso)
     db.run(`CREATE TABLE IF NOT EXISTS Alumnos (
       id_alumno INTEGER PRIMARY KEY AUTOINCREMENT,
       numero_control TEXT UNIQUE NOT NULL,
@@ -36,7 +46,7 @@ function setupDatabase() {
       fecha_nacimiento TEXT,
       status TEXT,
       id_periodo_ingreso_fk INTEGER,
-      FOREIGN KEY (id_periodo_ingreso_fk) REFERENCES PeriodosEscolares(id_periodo)
+      FOREIGN KEY (id_periodo_ingreso_fk) REFERENCES PeriodosEscolares(id_periodo) ON DELETE RESTRICT
     )`);
 
     // 3. Tabla PeriodosEscolares
@@ -45,50 +55,63 @@ function setupDatabase() {
       nombre TEXT UNIQUE NOT NULL
     )`);
 
-    // 3.5. NUEVA Tabla Grupos (Amarrada a Periodos)
+    // 3.5. Tabla Grupos (Con RESTRICT al Periodo)
     db.run(`CREATE TABLE IF NOT EXISTS Grupos (
       id_grupo INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre_grupo TEXT NOT NULL,
       id_periodo_fk INTEGER NOT NULL,
-      FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo)
+      FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo) ON DELETE RESTRICT
     )`);
 
-    // 4. Tabla Materias (ACTUALIZADA CON CRÉDITOS)
+    // 4. Tabla Materias
     db.run(`CREATE TABLE IF NOT EXISTS Materias (
       id_materia INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre_materia TEXT NOT NULL,
       semestre_ideal INTEGER,
-      creditos INTEGER DEFAULT 0 -- ¡NUEVO CAMPO PARA GRÁFICAS PONDERADAS!
+      creditos INTEGER DEFAULT 0
     )`);
 
-    // 5. Tabla Titulados (VERSIÓN 3 - FINAL)
+    // 5. Tabla Titulados (Con RESTRICT al Alumno)
     db.run(`CREATE TABLE IF NOT EXISTS Titulados (
       id_titulacion INTEGER PRIMARY KEY AUTOINCREMENT,
       id_alumno_fk INTEGER NOT NULL,
       fecha_titulacion TEXT NOT NULL,
       modalidad TEXT NOT NULL,
       folio_acta TEXT,
-      promedio REAL,             -- Nuevo campo
-      mencion_honorifica INTEGER, -- Nuevo campo (0 o 1)
-      FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno)
+      promedio REAL,
+      mencion_honorifica INTEGER,
+      FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno) ON DELETE RESTRICT
     )`);
 
-    // 6. Tabla Inscripciones (ACTUALIZADA: Cambio de 'grupo TEXT' a 'id_grupo_fk INTEGER')
+    // 6. Tabla Inscripciones (¡NUEVO MODELO TECNM!)
     db.run(`CREATE TABLE IF NOT EXISTS Inscripciones (
       id_inscripcion INTEGER PRIMARY KEY AUTOINCREMENT,
       id_alumno_fk INTEGER NOT NULL,
       id_materia_fk INTEGER NOT NULL,
       id_periodo_fk INTEGER NOT NULL,
-      id_grupo_fk INTEGER NOT NULL, -- ¡NUEVO CAMPO RELACIONAL OFICIAL!
-      calificacion REAL, 
+      id_grupo_fk INTEGER NOT NULL,
+      
+      -- Sistema de Competencias Dinámico
+      c1 REAL, c2 REAL, c3 REAL, c4 REAL,
+      c5 REAL, c6 REAL, c7 REAL, c8 REAL,
+      calificacion_final REAL, 
+      
+      -- Reglas Universitarias
       estado_materia TEXT DEFAULT 'Cursando', 
-      FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno),
-      FOREIGN KEY (id_materia_fk) REFERENCES Materias(id_materia),
-      FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo),
-      FOREIGN KEY (id_grupo_fk) REFERENCES Grupos(id_grupo)
+      tipo_acreditacion TEXT DEFAULT 'CN', -- CN, SO, CI
+      
+      -- Auditoría
+      fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+      fecha_modificacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+      
+      -- Blindaje Restrictivo
+      FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno) ON DELETE RESTRICT,
+      FOREIGN KEY (id_materia_fk) REFERENCES Materias(id_materia) ON DELETE RESTRICT,
+      FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo) ON DELETE RESTRICT,
+      FOREIGN KEY (id_grupo_fk) REFERENCES Grupos(id_grupo) ON DELETE RESTRICT
     )`);
 
-    console.log("Base de datos y tablas aseguradas.");
+    console.log("Base de datos y tablas aseguradas con arquitectura TecNM.");
   });
 }
 
@@ -741,58 +764,98 @@ ipcMain.handle("update-materia", async (event, data) => {
 });
 
 /**
- * NUEVO: Guarda múltiples calificaciones de golpe (Sábana Inteligente)
- * Recibe un array de objetos con las calificaciones de todo un grupo
+ * Guarda múltiples calificaciones (ALGORITMO UPSERT: Inserta, Actualiza o Borra)
  */
-/**
- * Guarda múltiples calificaciones (ACTUALIZADO PARA id_grupo_fk)
- */
-ipcMain.handle("save-calificaciones-masivas", async (event, arrayDatos) => {
+ipcMain.handle("save-calificaciones-masivas", async (event, payload) => {
   return new Promise((resolve, reject) => {
+    // Extraemos el paquete de datos estructurado que nos enviará el frontend
+    const { id_periodo, id_materia, id_grupo, alumnos } = payload;
+
     db.serialize(() => {
       db.run("BEGIN TRANSACTION");
 
-      const sql = `
-        INSERT INTO Inscripciones (id_alumno_fk, id_materia_fk, id_periodo_fk, id_grupo_fk, calificacion, estado_materia) 
-        VALUES (?, ?, ?, ?, ?, ?)
-      `;
-      const stmt = db.prepare(sql);
-
-      let errores = 0;
-
-      arrayDatos.forEach((dato) => {
-        let estado = "Cursando";
-        if (dato.calificacion !== null && dato.calificacion !== "") {
-          estado =
-            parseFloat(dato.calificacion) >= 70 ? "Aprobada" : "Reprobada";
-        }
-        if (dato.estado_forzado) {
-          estado = dato.estado_forzado;
-        }
-
-        stmt.run(
-          [
-            dato.id_alumno,
-            dato.id_materia,
-            dato.id_periodo,
-            dato.id_grupo_fk,
-            dato.calificacion,
-            estado,
-          ],
-          (err) => {
-            if (err) errores++;
-          },
-        );
-      });
-
-      stmt.finalize((err) => {
-        if (err || errores > 0) {
+      // 1. Obtenemos lo que ya existe en la BD para esta clase exacta
+      const sqlExistentes =
+        "SELECT id_inscripcion FROM Inscripciones WHERE id_periodo_fk=? AND id_materia_fk=? AND id_grupo_fk=?";
+      db.all(sqlExistentes, [id_periodo, id_materia, id_grupo], (err, rows) => {
+        if (err) {
           db.run("ROLLBACK");
-          reject(new Error("Error al guardar la lista. Verifica los datos."));
-        } else {
-          db.run("COMMIT");
-          resolve({ success: true });
+          return reject(err);
         }
+
+        // Mapeamos los IDs existentes y los que vienen de la pantalla
+        const existentes = rows.map((r) => r.id_inscripcion);
+        const entrantes = alumnos
+          .filter((a) => a.id_inscripcion)
+          .map((a) => a.id_inscripcion);
+
+        // 2. MAGIA DE BORRADO: Si estaba en BD pero ya no está en pantalla, lo borramos (La "X" del UI)
+        const aBorrar = existentes.filter((id) => !entrantes.includes(id));
+        aBorrar.forEach((id) => {
+          db.run("DELETE FROM Inscripciones WHERE id_inscripcion=?", [id]);
+        });
+
+        // 3. Preparamos las sentencias de Insertar y Actualizar
+        const stmtInsert = db.prepare(`
+          INSERT INTO Inscripciones 
+          (id_alumno_fk, id_materia_fk, id_periodo_fk, id_grupo_fk, c1, c2, c3, c4, c5, c6, c7, c8, calificacion_final, estado_materia, tipo_acreditacion) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        const stmtUpdate = db.prepare(`
+          UPDATE Inscripciones SET 
+          c1=?, c2=?, c3=?, c4=?, c5=?, c6=?, c7=?, c8=?, calificacion_final=?, estado_materia=?, tipo_acreditacion=?, fecha_modificacion=CURRENT_TIMESTAMP
+          WHERE id_inscripcion=?
+        `);
+
+        // 4. Ejecutamos según corresponda
+        alumnos.forEach((a) => {
+          if (a.id_inscripcion) {
+            // Ya existía: ACTUALIZAR
+            stmtUpdate.run([
+              a.c1,
+              a.c2,
+              a.c3,
+              a.c4,
+              a.c5,
+              a.c6,
+              a.c7,
+              a.c8,
+              a.calificacion_final,
+              a.estado_materia,
+              a.tipo_acreditacion,
+              a.id_inscripcion,
+            ]);
+          } else {
+            // Es nuevo en la lista: INSERTAR
+            stmtInsert.run([
+              a.id_alumno_fk,
+              id_materia,
+              id_periodo,
+              id_grupo,
+              a.c1,
+              a.c2,
+              a.c3,
+              a.c4,
+              a.c5,
+              a.c6,
+              a.c7,
+              a.c8,
+              a.calificacion_final,
+              a.estado_materia,
+              a.tipo_acreditacion,
+            ]);
+          }
+        });
+
+        stmtInsert.finalize();
+        stmtUpdate.finalize();
+
+        // Si todo salió bien, sellamos la transacción
+        db.run("COMMIT", (err) => {
+          if (err) reject(err);
+          else resolve({ success: true });
+        });
       });
     });
   });
@@ -814,6 +877,135 @@ ipcMain.handle("get-grupo-especifico", async (event, data) => {
     db.all(sql, [id_periodo, id_materia, id_grupo_fk], (err, rows) => {
       if (err) reject(err);
       else resolve(rows);
+    });
+  });
+});
+
+/**
+ * Obtiene el historial (Kárdex) con soporte para competencias, acreditación y recurses
+ */
+ipcMain.handle("get-historial-alumno", async (event, id_alumno) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT 
+        i.id_inscripcion,
+        i.calificacion_final,
+        i.estado_materia,
+        i.tipo_acreditacion,
+        i.c1, i.c2, i.c3, i.c4, i.c5, i.c6, i.c7, i.c8,
+        i.id_periodo_fk,     
+        i.id_materia_fk,     
+        i.id_grupo_fk,       
+        m.nombre_materia,
+        m.semestre_ideal,
+        m.creditos,
+        p.nombre AS nombre_periodo,
+        g.nombre_grupo AS nombre_grupo
+      FROM Inscripciones i
+      JOIN Materias m ON i.id_materia_fk = m.id_materia
+      JOIN PeriodosEscolares p ON i.id_periodo_fk = p.id_periodo
+      JOIN Grupos g ON i.id_grupo_fk = g.id_grupo
+      WHERE i.id_alumno_fk = ?
+      ORDER BY p.nombre ASC -- Ordenamos cronológicamente para calcular los intentos (Recurse)
+    `;
+    db.all(sql, [id_alumno], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
+/**
+ * Actualiza un registro existente (Editar desde Kárdex)
+ */
+ipcMain.handle("update-inscripcion", async (event, data) => {
+  return new Promise((resolve, reject) => {
+    const {
+      id_inscripcion,
+      id_periodo_fk,
+      id_materia_fk,
+      id_grupo_fk,
+      calificacion_final,
+      estado_materia,
+    } = data;
+    const sql = `
+      UPDATE Inscripciones 
+      SET id_periodo_fk = ?, id_materia_fk = ?, id_grupo_fk = ?, calificacion_final = ?, estado_materia = ?, fecha_modificacion = CURRENT_TIMESTAMP
+      WHERE id_inscripcion = ?
+    `;
+    db.run(
+      sql,
+      [
+        id_periodo_fk,
+        id_materia_fk,
+        id_grupo_fk,
+        calificacion_final,
+        estado_materia,
+        id_inscripcion,
+      ],
+      function (err) {
+        if (err) reject(err);
+        else resolve({ success: true });
+      },
+    );
+  });
+});
+
+/**
+ * ¡NUEVO! Registra una inscripción individual (Crear desde Kárdex)
+ */
+ipcMain.handle("add-inscripcion-individual", async (event, data) => {
+  return new Promise((resolve, reject) => {
+    const {
+      id_alumno,
+      id_materia,
+      id_periodo,
+      id_grupo_fk,
+      calificacion_final,
+      estado_materia,
+    } = data;
+
+    // Protegemos que no lo inscriban dos veces en la misma materia/periodo
+    const checkSql =
+      "SELECT id_inscripcion FROM Inscripciones WHERE id_alumno_fk=? AND id_materia_fk=? AND id_periodo_fk=?";
+    db.get(checkSql, [id_alumno, id_materia, id_periodo], (err, row) => {
+      if (err) return reject(err);
+      if (row)
+        return reject(
+          new Error(
+            "El alumno ya tiene calificación en esta materia para este periodo.",
+          ),
+        );
+
+      const sql = `INSERT INTO Inscripciones (id_alumno_fk, id_materia_fk, id_periodo_fk, id_grupo_fk, calificacion_final, estado_materia, tipo_acreditacion) VALUES (?, ?, ?, ?, ?, ?, 'CN')`;
+      db.run(
+        sql,
+        [
+          id_alumno,
+          id_materia,
+          id_periodo,
+          id_grupo_fk,
+          calificacion_final,
+          estado_materia,
+        ],
+        function (err) {
+          if (err) reject(err);
+          else resolve({ success: true, id: this.lastID });
+        },
+      );
+    });
+  });
+});
+
+/**
+ * ¡NUEVO! Elimina un registro del historial (Borrar)
+ */
+ipcMain.handle("delete-inscripcion", async (event, id_inscripcion) => {
+  return new Promise((resolve, reject) => {
+    const sql = "DELETE FROM Inscripciones WHERE id_inscripcion = ?";
+    db.run(sql, [id_inscripcion], function (err) {
+      if (err) reject(err);
+      else resolve({ success: true });
     });
   });
 });
