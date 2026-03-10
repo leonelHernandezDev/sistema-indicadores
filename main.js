@@ -1010,6 +1010,20 @@ ipcMain.handle("delete-inscripcion", async (event, id_inscripcion) => {
   });
 });
 
+/**
+ * ¡NUEVO! Actualiza el Status Institucional Global de un alumno desde el Kárdex (Pilar 6)
+ */
+ipcMain.handle("update-alumno-status", async (event, data) => {
+  return new Promise((resolve, reject) => {
+    const { id_alumno, status } = data;
+    const sql = "UPDATE Alumnos SET status = ? WHERE id_alumno = ?";
+    db.run(sql, [status, id_alumno], function (err) {
+      if (err) reject(err);
+      else resolve({ success: true });
+    });
+  });
+});
+
 // ==========================================
 //    MÓDULO DE TITULACIÓN (FINAL)
 // ==========================================

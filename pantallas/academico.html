@@ -87,9 +87,65 @@
                   <i class="bi bi-hash"></i
                   ><span id="acad-alumno-control">---</span>
                 </p>
-                <span class="badge bg-secondary mt-2" id="acad-alumno-status"
-                  >Sin selección</span
-                >
+                <div class="dropdown mt-2">
+                  <button
+                    class="btn btn-sm btn-secondary dropdown-toggle"
+                    type="button"
+                    id="acad-alumno-status-btn"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    disabled
+                  >
+                    Sin selección
+                  </button>
+                  <ul
+                    class="dropdown-menu dropdown-menu-dark shadow"
+                    aria-labelledby="acad-alumno-status-btn"
+                  >
+                    <li>
+                      <h6 class="dropdown-header text-muted small">
+                        Cambiar Estatus:
+                      </h6>
+                    </li>
+                    <li>
+                      <a
+                        class="dropdown-item status-option"
+                        href="#"
+                        data-status="Activo"
+                        ><i class="bi bi-check-circle text-success me-2"></i
+                        >Activo</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        class="dropdown-item status-option"
+                        href="#"
+                        data-status="Baja Temporal"
+                        ><i class="bi bi-pause-circle text-warning me-2"></i
+                        >Baja Temporal</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        class="dropdown-item status-option"
+                        href="#"
+                        data-status="Baja Definitiva"
+                        ><i class="bi bi-x-circle text-danger me-2"></i>Baja
+                        Definitiva</a
+                      >
+                    </li>
+                    <li><hr class="dropdown-divider border-secondary" /></li>
+                    <li>
+                      <a
+                        class="dropdown-item status-option"
+                        href="#"
+                        data-status="Egresado"
+                        ><i class="bi bi-mortarboard text-info me-2"></i
+                        >Egresado</a
+                      >
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
             <div

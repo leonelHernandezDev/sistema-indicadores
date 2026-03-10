@@ -1116,13 +1116,16 @@
 
           acadAlumnoNombre.textContent = `${alumno.nombre} ${alumno.apellido_paterno} ${alumno.apellido_materno || ""}`;
           acadAlumnoControl.textContent = alumno.numero_control;
-          acadAlumnoStatus.textContent = alumno.status;
-          acadAlumnoStatus.className = `badge mt-2 ${alumno.status === "Activo" ? "bg-success" : "bg-danger"}`;
+
+          // PILAR 6: Control del Botón Desplegable de Estatus
+          const btnStatus = document.getElementById("acad-alumno-status-btn");
+          btnStatus.textContent = alumno.status;
+          btnStatus.className = `btn btn-sm dropdown-toggle text-white border-0 ${alumno.status === "Activo" ? "bg-success" : alumno.status === "Baja Temporal" ? "bg-warning text-dark" : alumno.status === "Egresado" ? "bg-info text-dark" : "bg-danger"}`;
+          btnStatus.disabled = false;
 
           acadWorkspace.style.opacity = "1";
           acadWorkspace.style.pointerEvents = "auto";
 
-          // Si cambiamos de alumno, cancelamos cualquier edición que estuviera a medias
           formAcademico.reset();
           idInscripcionAEditar = null;
           if (btnGuardarKardex) {
@@ -1133,6 +1136,42 @@
 
           cargarKardex(alumno.id_alumno);
         };
+
+        // PILAR 6: Listener para guardar el nuevo estatus en la BD al hacer clic
+        document.querySelectorAll(".status-option").forEach((item) => {
+          item.addEventListener("click", async (e) => {
+            e.preventDefault();
+            if (!alumnoSeleccionado) return;
+            const nuevoStatus = e.target.closest("a").dataset.status;
+
+            if (
+              await window.electronAPI.invoke(
+                "dialog-confirm",
+                `¿Cambiar el estatus global del alumno a "${nuevoStatus}"?`,
+              )
+            ) {
+              try {
+                await window.electronAPI.invoke("update-alumno-status", {
+                  id_alumno: alumnoSeleccionado.id_alumno,
+                  status: nuevoStatus,
+                });
+                alumnoSeleccionado.status = nuevoStatus; // Actualizamos en memoria
+                seleccionarAlumnoIndividual(alumnoSeleccionado); // Recargamos la UI visual
+                // Actualizamos la base global oculta para el buscador
+                const indexGlobal = todosLosAlumnos.findIndex(
+                  (a) => a.id_alumno === alumnoSeleccionado.id_alumno,
+                );
+                if (indexGlobal > -1)
+                  todosLosAlumnos[indexGlobal].status = nuevoStatus;
+              } catch (error) {
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "Error al cambiar estatus: " + error.message,
+                );
+              }
+            }
+          });
+        });
 
         const cargarKardex = async (id_alumno) => {
           kardexTableBody.innerHTML =
@@ -1437,6 +1476,7 @@
         );
 
         let alumnosEnSabana = [];
+        window.cambiosSinGuardarSabana = false;
         let esListaNueva = true;
 
         // 1. Cargar Comboboxes iniciales
@@ -1823,7 +1863,7 @@
               // Alerta visual de cambios sin guardar
               sabanaStatusGuardado.innerHTML =
                 '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Cambios sin guardar</span>';
-
+              window.cambiosSinGuardarSabana = true;
               // Disparar cálculo automático
               calcularPromedioFila(e.target.closest("tr"));
             });
@@ -1866,6 +1906,7 @@
                 );
                 sabanaStatusGuardado.innerHTML =
                   '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Cambios sin guardar (Alumno removido)</span>';
+                window.cambiosSinGuardarSabana = true;
                 renderizarSabanaDinamica();
               }
             });
@@ -1980,6 +2021,7 @@
                       // Agregar alumno nuevo a la vista
                       a.id_alumno_fk = a.id_alumno;
                       alumnosEnSabana.push(a);
+                      window.cambiosSinGuardarSabana = true; //AQUI LA PUSEEEE
                       sabanaStatusGuardado.innerHTML =
                         '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Cambios sin guardar (Alumno nuevo)</span>';
                       renderizarSabanaDinamica();
@@ -2090,6 +2132,7 @@
             );
 
             if (res.success) {
+              window.cambiosSinGuardarSabana = false;
               btnGuardarSabana.classList.replace("btn-primary", "btn-success");
               btnGuardarSabana.classList.replace("btn-warning", "btn-success");
               btnGuardarSabana.innerHTML =
@@ -2120,6 +2163,49 @@
             sabanaEmptyState.classList.add("d-none");
             alumnosEnSabana = [];
           });
+
+        // ==========================================
+        // PILAR 7: ÁNGEL DE LA GUARDA (Unsaved Changes)
+        // ==========================================
+        const tabGrupal = document.getElementById("grupal-tab");
+        tabGrupal.addEventListener("hide.bs.tab", async (e) => {
+          if (window.cambiosSinGuardarSabana) {
+            e.preventDefault(); // Detenemos el cambio de pestaña
+            const confirmar = await window.electronAPI.invoke(
+              "dialog-confirm",
+              "⚠️ Tienes calificaciones capturadas sin guardar.\n\nSi cambias de pestaña, perderás este progreso. ¿Deseas salir y PERDER los cambios?",
+            );
+            if (confirmar) {
+              window.cambiosSinGuardarSabana = false;
+              // Forzamos el cambio a la pestaña que quería ir
+              const tab = new bootstrap.Tab(e.relatedTarget);
+              tab.show();
+            }
+          }
+        });
+
+        // Aplicamos la misma protección al botón "Cerrar Lista"
+        const btnLimpiarSabana = document.getElementById("btn-limpiar-sabana");
+        // Quitamos el evento viejo reemplazando el botón consigo mismo
+        const nuevoBtnLimpiar = btnLimpiarSabana.cloneNode(true);
+        btnLimpiarSabana.parentNode.replaceChild(
+          nuevoBtnLimpiar,
+          btnLimpiarSabana,
+        );
+
+        nuevoBtnLimpiar.addEventListener("click", async () => {
+          if (window.cambiosSinGuardarSabana) {
+            const confirmar = await window.electronAPI.invoke(
+              "dialog-confirm",
+              "⚠️ Tienes calificaciones capturadas sin guardar.\n\n¿Estás seguro de cerrar la lista y PERDER los cambios?",
+            );
+            if (!confirmar) return;
+          }
+          window.cambiosSinGuardarSabana = false;
+          sabanaWorkspace.classList.add("d-none");
+          document.getElementById("sabana-empty-state").classList.add("d-none");
+          alumnosEnSabana = [];
+        });
       }
 
       // ==========================================
