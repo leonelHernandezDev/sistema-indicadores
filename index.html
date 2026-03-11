@@ -351,6 +351,9 @@
           if (pageName === "gestion-alumnos") {
             await cargarAlumnos();
             conectarBotonesAlumnos();
+          } else if (pageName === "inicio") {
+            // <--- AGREGAR ESTO
+            await setupInicio(); // <--- AGREGAR ESTO
           } else if (pageName === "form-alumno") {
             await conectarBotonesFormAlumno(data);
           } else if (pageName === "config-periodos") {
@@ -379,6 +382,218 @@
       );
 
       loadContent("inicio");
+
+      // ==========================================
+      //    LÓGICA: DASHBOARD (INICIO)
+      // ==========================================
+      // Variables globales para poder destruir las gráficas al actualizar
+      let chartGauss, chartAprobacion, chartTopMaterias, chartRegulares;
+
+      async function setupInicio() {
+        // Configuramos el color global de Chart.js para que combine con el Dark Mode
+        Chart.defaults.color = "#a3a3a3";
+        Chart.defaults.borderColor = "#262626";
+
+        const selectPeriodo = document.getElementById("dash-filtro-periodo");
+        const selectSemestre = document.getElementById("dash-filtro-semestre");
+        const btnAnalizar = document.getElementById("btn-analizar-periodo");
+
+        // 1. Cargar el catálogo de periodos en el filtro
+        try {
+          const periodos = await window.electronAPI.invoke("get-periodos");
+          selectPeriodo.innerHTML =
+            '<option value="">Seleccione Periodo...</option>';
+          periodos.forEach(
+            (p) =>
+              (selectPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`),
+          );
+
+          // Seleccionar el periodo más reciente por defecto
+          if (periodos.length > 0) selectPeriodo.value = periodos[0].id_periodo;
+        } catch (e) {
+          console.error(e);
+        }
+
+        // 2. Evento del Botón Analizar
+        btnAnalizar.addEventListener("click", async () => {
+          const id_periodo = selectPeriodo.value;
+          const semestre = selectSemestre.value;
+          if (!id_periodo)
+            return window.electronAPI.invoke(
+              "dialog-alert",
+              "Por favor, selecciona un Periodo Escolar.",
+            );
+
+          try {
+            const originalText = btnAnalizar.innerHTML;
+            btnAnalizar.innerHTML =
+              '<span class="spinner-border spinner-border-sm me-2"></span> Calculando...';
+            btnAnalizar.disabled = true;
+
+            const res = await window.electronAPI.invoke("get-dashboard-zona2", {
+              id_periodo,
+              semestre,
+            });
+
+            // --- A. ACTUALIZAR KPIs GIGANTES ---
+            document.getElementById("kpi-inscritos-periodo").textContent =
+              res.kpis.total_alumnos || 0;
+            document.getElementById("kpi-promedio-periodo").textContent = res
+              .kpis.promedio_general
+              ? parseFloat(res.kpis.promedio_general).toFixed(1)
+              : "--";
+
+            const totalMat = res.kpis.total_materias || 0;
+            const reprobadas = res.kpis.reprobadas || 0;
+            const indiceRep =
+              totalMat > 0 ? ((reprobadas / totalMat) * 100).toFixed(1) : 0;
+            document.getElementById("kpi-reprobacion-periodo").textContent =
+              `${indiceRep}%`;
+
+            // --- B. DESTRUIR GRÁFICAS VIEJAS (Evita que se encimen) ---
+            if (chartGauss) chartGauss.destroy();
+            if (chartAprobacion) chartAprobacion.destroy();
+            if (chartTopMaterias) chartTopMaterias.destroy();
+            if (chartRegulares) chartRegulares.destroy();
+
+            // --- C. DIBUJAR GRÁFICAS ---
+
+            // 1. Campana de Gauss (Barras)
+            chartGauss = new Chart(
+              document.getElementById("chart-campana-gauss"),
+              {
+                type: "bar",
+                data: {
+                  labels: [
+                    "NA (<70)",
+                    "Regular (70-79)",
+                    "Bueno (80-89)",
+                    "Excelente (90-100)",
+                  ],
+                  datasets: [
+                    {
+                      label: "Materias",
+                      data: [
+                        res.gauss.na || 0,
+                        res.gauss.regular || 0,
+                        res.gauss.bueno || 0,
+                        res.gauss.excelente || 0,
+                      ],
+                      backgroundColor: [
+                        "#dc3545",
+                        "#fd7e14",
+                        "#0dcaf0",
+                        "#198754",
+                      ],
+                      borderRadius: 4,
+                    },
+                  ],
+                },
+                options: {
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                },
+              },
+            );
+
+            // 2. Aprobación vs Reprobación (Pastel)
+            const aprobadas = totalMat - reprobadas;
+            chartAprobacion = new Chart(
+              document.getElementById("chart-aprobacion-periodo"),
+              {
+                type: "pie",
+                data: {
+                  labels: ["Aprobadas", "Reprobadas (NA)"],
+                  datasets: [
+                    {
+                      data: [aprobadas, reprobadas],
+                      backgroundColor: ["#198754", "#dc3545"],
+                      borderWidth: 0,
+                    },
+                  ],
+                },
+                options: { maintainAspectRatio: false },
+              },
+            );
+
+            // 3. Top Materias (Barras Horizontales)
+            const nombresMaterias = res.topMaterias.map(
+              (m) => m.nombre_materia,
+            );
+            const conteoMaterias = res.topMaterias.map((m) => m.reprobados);
+            chartTopMaterias = new Chart(
+              document.getElementById("chart-top-materias"),
+              {
+                type: "bar",
+                data: {
+                  labels:
+                    nombresMaterias.length > 0
+                      ? nombresMaterias
+                      : ["No hay materias reprobadas"],
+                  datasets: [
+                    {
+                      label: "Alumnos Reprobados",
+                      data: conteoMaterias.length > 0 ? conteoMaterias : [0],
+                      backgroundColor: "#dc3545",
+                      borderRadius: 4,
+                    },
+                  ],
+                },
+                options: {
+                  indexAxis: "y", // La vuelve horizontal
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                },
+              },
+            );
+
+            // 4. Regulares vs Irregulares (Dona)
+            chartRegulares = new Chart(
+              document.getElementById("chart-regulares"),
+              {
+                type: "doughnut",
+                data: {
+                  labels: [
+                    "Limpios (Regulares)",
+                    "Deben 1 o más (Irregulares)",
+                  ],
+                  datasets: [
+                    {
+                      data: [
+                        res.regIrreg.regulares || 0,
+                        res.regIrreg.irregulares || 0,
+                      ],
+                      backgroundColor: ["#0dcaf0", "#ffc107"],
+                      borderWidth: 0,
+                      cutout: "70%", // Hace el agujero del centro más grande
+                    },
+                  ],
+                },
+                options: { maintainAspectRatio: false },
+              },
+            );
+
+            // Restaurar botón
+            btnAnalizar.innerHTML =
+              '<i class="bi bi-play-fill"></i> Analizar Periodo';
+            btnAnalizar.disabled = false;
+          } catch (error) {
+            console.error(error);
+            await window.electronAPI.invoke(
+              "dialog-alert",
+              "Error al procesar datos: " + error.message,
+            );
+            btnAnalizar.innerHTML =
+              '<i class="bi bi-play-fill"></i> Analizar Periodo';
+            btnAnalizar.disabled = false;
+          }
+        });
+
+        // Autodisparar el cálculo si hay un periodo cargado
+        if (selectPeriodo.value) {
+          btnAnalizar.click();
+        }
+      }
 
       // ==========================================
       //    LÓGICA: CONFIGURACIÓN
