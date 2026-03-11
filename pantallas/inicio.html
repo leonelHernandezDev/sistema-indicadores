@@ -1,4 +1,414 @@
-<h1><i class="bi bi-house-door-fill"></i> Pantalla de Inicio</h1>
-<p class="lead">Aquí irá el dashboard principal.</p>
-<hr />
-<p>Contenido del Dashboard: Gráficas de matrícula, etc.</p>
+<div class="workspace-container d-flex flex-column h-100">
+  <div
+    class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0"
+  >
+    <div>
+      <h3 class="mb-0 fw-bold text-white">
+        <i class="bi bi-speedometer2 me-2"></i>Dashboard Ejecutivo
+      </h3>
+      <p class="text-muted small mb-0">
+        Inteligencia de Negocios y Rendimiento Académico
+      </p>
+    </div>
+  </div>
+
+  <ul
+    class="nav nav-pills mb-3 flex-shrink-0"
+    id="dashboardTabs"
+    role="tablist"
+  >
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link active"
+        id="tab-global"
+        data-bs-toggle="pill"
+        data-bs-target="#panel-global"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-globe me-2"></i>Visión Global (Histórica)
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="tab-periodo"
+        data-bs-toggle="pill"
+        data-bs-target="#panel-periodo"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-calendar3 me-2"></i>Radiografía del Periodo
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="tab-micro"
+        data-bs-toggle="pill"
+        data-bs-target="#panel-micro"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-search me-2"></i>Análisis Micro (Materia)
+      </button>
+    </li>
+  </ul>
+
+  <div
+    class="tab-content flex-grow-1"
+    id="dashboardTabsContent"
+    style="overflow-y: auto; overflow-x: hidden; padding-right: 5px"
+  >
+    <div
+      class="tab-pane fade show active pb-4"
+      id="panel-global"
+      role="tabpanel"
+    >
+      <div class="card bg-dark border-0 shadow-sm mb-3">
+        <div class="card-body py-2 d-flex align-items-center gap-3">
+          <label class="text-muted small fw-bold mb-0"
+            ><i class="bi bi-funnel-fill"></i> Rango Histórico:</label
+          >
+          <select
+            id="dash-filtro-anos"
+            class="form-select form-select-sm w-auto bg-black text-white border-secondary"
+          >
+            <option value="todos">Todos los tiempos (Desde el inicio)</option>
+            <option value="5">Últimos 5 años</option>
+            <option value="3">Últimos 3 años</option>
+          </select>
+          <button
+            class="btn btn-sm btn-outline-primary"
+            id="btn-refresh-global"
+          >
+            <i class="bi bi-arrow-clockwise"></i> Actualizar
+          </button>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm bg-primary bg-opacity-10 h-100">
+            <div class="card-body text-center">
+              <h6 class="text-primary text-uppercase fw-bold mb-1">
+                Matrícula Viva Total
+              </h6>
+              <h2
+                class="display-5 fw-bold text-white mb-0"
+                id="kpi-matricula-viva"
+              >
+                --
+              </h2>
+              <small class="text-muted">Activos + Bajas Temporales</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm bg-success bg-opacity-10 h-100">
+            <div class="card-body text-center">
+              <h6 class="text-success text-uppercase fw-bold mb-1">
+                Total Egresados/Titulados
+              </h6>
+              <h2
+                class="display-5 fw-bold text-white mb-0"
+                id="kpi-egresados-historico"
+              >
+                --
+              </h2>
+              <small class="text-muted">Acumulado histórico</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm bg-info bg-opacity-10 h-100">
+            <div class="card-body text-center">
+              <h6 class="text-info text-uppercase fw-bold mb-1">
+                Promedio Histórico
+              </h6>
+              <h2
+                class="display-5 fw-bold text-white mb-0"
+                id="kpi-promedio-historico"
+              >
+                --
+              </h2>
+              <small class="text-muted">General de la carrera</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-8">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">
+                Evolución de Matrícula y Egreso
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="min-height: 300px">
+              <canvas id="chart-evolucion-matricula"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">Demografía Institucional</h6>
+            </div>
+            <div
+              class="card-body position-relative d-flex justify-content-center align-items-center"
+              style="min-height: 300px"
+            >
+              <canvas id="chart-demografia"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade pb-4" id="panel-periodo" role="tabpanel">
+      <div class="card bg-dark border-0 shadow-sm mb-3">
+        <div class="card-body py-2 d-flex flex-wrap align-items-center gap-3">
+          <label class="text-muted small fw-bold mb-0"
+            ><i class="bi bi-funnel-fill"></i> Filtros de Periodo:</label
+          >
+          <select
+            id="dash-filtro-periodo"
+            class="form-select form-select-sm w-auto bg-black text-white border-secondary"
+          >
+            <option value="">Cargando periodos...</option>
+          </select>
+          <select
+            id="dash-filtro-semestre"
+            class="form-select form-select-sm w-auto bg-black text-white border-secondary"
+          >
+            <option value="todos">Todos los Semestres</option>
+            <option value="1">1° Semestre</option>
+            <option value="2">2° Semestre</option>
+            <option value="3">3° Semestre</option>
+            <option value="4">4° Semestre</option>
+            <option value="5">5° Semestre</option>
+            <option value="6">6° Semestre</option>
+            <option value="7">7° Semestre</option>
+            <option value="8">8° Semestre</option>
+            <option value="9">9° Semestre o más</option>
+          </select>
+          <button
+            class="btn btn-sm btn-primary shadow"
+            id="btn-analizar-periodo"
+          >
+            <i class="bi bi-play-fill"></i> Analizar Periodo
+          </button>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <div
+            class="card border-0 shadow-sm h-100 border-start border-4 border-info"
+          >
+            <div
+              class="card-body d-flex justify-content-between align-items-center"
+            >
+              <div>
+                <small class="text-muted text-uppercase fw-bold"
+                  >Alumnos Inscritos</small
+                >
+                <h3 class="fw-bold mb-0" id="kpi-inscritos-periodo">--</h3>
+              </div>
+              <i class="bi bi-people fs-1 text-info opacity-50"></i>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div
+            class="card border-0 shadow-sm h-100 border-start border-4 border-success"
+          >
+            <div
+              class="card-body d-flex justify-content-between align-items-center"
+            >
+              <div>
+                <small class="text-muted text-uppercase fw-bold"
+                  >Promedio General</small
+                >
+                <h3 class="fw-bold mb-0" id="kpi-promedio-periodo">--</h3>
+              </div>
+              <i class="bi bi-bar-chart-line fs-1 text-success opacity-50"></i>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div
+            class="card border-0 shadow-sm h-100 border-start border-4 border-danger"
+          >
+            <div
+              class="card-body d-flex justify-content-between align-items-center"
+            >
+              <div>
+                <small class="text-muted text-uppercase fw-bold"
+                  >Índice Reprobación</small
+                >
+                <h3
+                  class="fw-bold text-danger mb-0"
+                  id="kpi-reprobacion-periodo"
+                >
+                  --%
+                </h3>
+              </div>
+              <i
+                class="bi bi-exclamation-triangle fs-1 text-danger opacity-50"
+              ></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-7">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">
+                Distribución de Calificaciones (Campana de Gauss)
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="min-height: 250px">
+              <canvas id="chart-campana-gauss"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-5">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">
+                Aprobación vs. Reprobación (NA)
+              </h6>
+            </div>
+            <div
+              class="card-body position-relative d-flex justify-content-center align-items-center"
+              style="min-height: 250px"
+            >
+              <canvas id="chart-aprobacion-periodo"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-8">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-danger">
+                <i class="bi bi-fire me-2"></i>Top 5 Materias con mayor índice
+                de Reprobación
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="min-height: 300px">
+              <canvas id="chart-top-materias"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">Regulares vs. Irregulares</h6>
+            </div>
+            <div
+              class="card-body position-relative d-flex justify-content-center align-items-center"
+              style="min-height: 300px"
+            >
+              <canvas id="chart-regulares"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade pb-4" id="panel-micro" role="tabpanel">
+      <div class="card bg-dark border-0 shadow-sm mb-3">
+        <div class="card-body py-2 d-flex flex-wrap align-items-center gap-3">
+          <label class="text-muted small fw-bold mb-0"
+            ><i class="bi bi-search"></i> Lupa Docente:</label
+          >
+          <select
+            id="dash-micro-periodo"
+            class="form-select form-select-sm w-auto bg-black text-white border-secondary"
+          >
+            <option value="">Periodo...</option>
+          </select>
+          <select
+            id="dash-micro-materia"
+            class="form-select form-select-sm w-auto bg-black text-white border-secondary"
+          >
+            <option value="">Materia...</option>
+          </select>
+          <select
+            id="dash-micro-grupo"
+            class="form-select form-select-sm w-auto bg-black text-white border-secondary"
+          >
+            <option value="todos">Todos los grupos</option>
+          </select>
+          <button class="btn btn-sm btn-primary shadow" id="btn-analizar-micro">
+            <i class="bi bi-eye-fill"></i> Aislar Materia
+          </button>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-8">
+          <div class="card border-0 shadow-sm h-100">
+            <div
+              class="card-header border-0 bg-transparent pt-3 d-flex justify-content-between"
+            >
+              <h6 class="mb-0 fw-bold text-muted">
+                Mapa de Supervivencia por Competencias (C1 - C8)
+              </h6>
+              <span class="badge bg-secondary" id="lbl-micro-materia"
+                >Materia no seleccionada</span
+              >
+            </div>
+            <div class="card-body position-relative" style="min-height: 350px">
+              <canvas id="chart-competencias"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">Tipo de Acreditación</h6>
+            </div>
+            <div
+              class="card-body position-relative d-flex justify-content-center align-items-center flex-column"
+              style="min-height: 350px"
+            >
+              <canvas id="chart-acreditacion"></canvas>
+              <div class="mt-4 text-center small text-muted w-100 px-3">
+                <div class="d-flex justify-content-between mb-1">
+                  <span class="text-white"
+                    ><i class="bi bi-circle-fill text-success me-1"></i> Normal
+                    (CN):</span
+                  >
+                  <span id="micro-val-cn">--</span>
+                </div>
+                <div class="d-flex justify-content-between mb-1">
+                  <span class="text-white"
+                    ><i class="bi bi-circle-fill text-warning me-1"></i> Segunda
+                    (SO):</span
+                  >
+                  <span id="micro-val-so">--</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span class="text-white"
+                    ><i class="bi bi-circle-fill text-info me-1"></i> Verano
+                    (CI):</span
+                  >
+                  <span id="micro-val-ci">--</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

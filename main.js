@@ -1123,3 +1123,98 @@ ipcMain.handle("delete-titulacion", async (event, id_titulacion) => {
     );
   });
 });
+
+// ==========================================
+//    MÓDULO DE DASHBOARD (BUSINESS INTELLIGENCE)
+// ==========================================
+
+ipcMain.handle("get-dashboard-zona2", async (event, data) => {
+  const { id_periodo, semestre } = data;
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Helpers para ejecutar consultas en promesas
+      const runGet = (sql, params) =>
+        new Promise((res, rej) =>
+          db.get(sql, params, (err, row) => (err ? rej(err) : res(row))),
+        );
+      const runAll = (sql, params) =>
+        new Promise((res, rej) =>
+          db.all(sql, params, (err, rows) => (err ? rej(err) : res(rows))),
+        );
+
+      // Construcción dinámica de filtros
+      const join =
+        semestre !== "todos"
+          ? "JOIN Materias m ON i.id_materia_fk = m.id_materia"
+          : "";
+      const where =
+        semestre !== "todos"
+          ? "WHERE i.id_periodo_fk = ? AND m.semestre_ideal = ?"
+          : "WHERE i.id_periodo_fk = ?";
+      const params =
+        semestre !== "todos" ? [id_periodo, semestre] : [id_periodo];
+
+      // 1. TARJETAS KPI Y APROBACIÓN
+      const kpis = await runGet(
+        `
+        SELECT 
+          COUNT(DISTINCT i.id_alumno_fk) as total_alumnos,
+          AVG(CASE WHEN i.calificacion_final >= 70 THEN i.calificacion_final ELSE NULL END) as promedio_general,
+          SUM(CASE WHEN i.estado_materia = 'Reprobada' THEN 1 ELSE 0 END) as reprobadas,
+          COUNT(i.id_inscripcion) as total_materias
+        FROM Inscripciones i ${join} ${where}
+      `,
+        params,
+      );
+
+      // 2. CAMPANA DE GAUSS (Rangos TecNM)
+      const gauss = await runGet(
+        `
+        SELECT 
+          SUM(CASE WHEN i.calificacion_final < 70 OR i.estado_materia = 'Reprobada' THEN 1 ELSE 0 END) as na,
+          SUM(CASE WHEN i.calificacion_final >= 70 AND i.calificacion_final < 80 THEN 1 ELSE 0 END) as regular,
+          SUM(CASE WHEN i.calificacion_final >= 80 AND i.calificacion_final < 90 THEN 1 ELSE 0 END) as bueno,
+          SUM(CASE WHEN i.calificacion_final >= 90 AND i.calificacion_final <= 100 THEN 1 ELSE 0 END) as excelente
+        FROM Inscripciones i ${join} ${where}
+      `,
+        params,
+      );
+
+      // 3. TOP 5 MATERIAS CUELLO DE BOTELLA
+      const joinTop = semestre !== "todos" ? " AND m.semestre_ideal = ?" : "";
+      const topMaterias = await runAll(
+        `
+        SELECT m.nombre_materia, COUNT(i.id_inscripcion) as reprobados
+        FROM Inscripciones i
+        JOIN Materias m ON i.id_materia_fk = m.id_materia
+        WHERE i.id_periodo_fk = ? AND i.estado_materia = 'Reprobada' ${joinTop}
+        GROUP BY m.id_materia
+        ORDER BY reprobados DESC
+        LIMIT 5
+      `,
+        params,
+      );
+
+      // 4. REGULARES VS IRREGULARES (En este periodo)
+      const regIrreg = await runGet(
+        `
+        SELECT 
+          SUM(CASE WHEN reprobadas > 0 THEN 1 ELSE 0 END) as irregulares,
+          SUM(CASE WHEN reprobadas = 0 THEN 1 ELSE 0 END) as regulares
+        FROM (
+          SELECT i.id_alumno_fk, SUM(CASE WHEN i.estado_materia = 'Reprobada' THEN 1 ELSE 0 END) as reprobadas
+          FROM Inscripciones i ${join} ${where}
+          GROUP BY i.id_alumno_fk
+        )
+      `,
+        params,
+      );
+
+      // Enviamos todo el paquete ensamblado al frontend
+      resolve({ kpis, gauss, topMaterias, regIrreg });
+    } catch (error) {
+      reject(error);
+    }
+  });
+});
