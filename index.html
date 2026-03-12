@@ -88,15 +88,17 @@
         flex-direction: column;
         height: 100%;
         min-height: 0;
-        overflow: hidden;
+        overflow-y: auto; /* EL SCROLL NACE AQUÍ */
+        overflow-x: hidden;
       }
 
       .tab-pane {
         width: 100%;
-        height: 100%; /* Forzamos altura */
+        height: 100%;
         flex-direction: column;
         min-height: 0;
-        overflow: hidden;
+        overflow-y: auto; /* EL SCROLL VIVE AQUÍ */
+        overflow-x: hidden;
         display: none;
       }
 
@@ -390,75 +392,223 @@
       let chartGauss, chartAprobacion, chartTopMaterias, chartRegulares;
 
       async function setupInicio() {
-        // Configuramos el color global de Chart.js para que combine con el Dark Mode
         Chart.defaults.color = "#a3a3a3";
         Chart.defaults.borderColor = "#262626";
 
+        // Inicializar Tooltips de Bootstrap (Los signos de interrogación)
+        const tooltipTriggerList = document.querySelectorAll(
+          '[data-bs-toggle="tooltip"]',
+        );
+        [...tooltipTriggerList].map(
+          (tooltipTriggerEl) => new bootstrap.Tooltip(tooltipTriggerEl),
+        );
+
+        // ==========================================
+        // LAZY LOADING: ZONA 1 (GLOBAL)
+        // ==========================================
+        let chartEvolucion,
+          chartEvPromedio,
+          chartDemografia,
+          chartModalidades,
+          chartDesercion;
+        let zona1Cargada = false;
+
+        const cargarZona1 = async () => {
+          const filtroAnos = document.getElementById("dash-filtro-anos").value;
+          try {
+            const res = await window.electronAPI.invoke(
+              "get-dashboard-zona1",
+              filtroAnos,
+            );
+
+            document.getElementById("kpi-matricula-viva").textContent =
+              res.kpis.matricula_viva || 0;
+            document.getElementById("kpi-egresados-historico").textContent =
+              res.kpis.egresados || 0;
+            document.getElementById("kpi-promedio-historico").textContent = res
+              .kpis.promedio_historico
+              ? parseFloat(res.kpis.promedio_historico).toFixed(1)
+              : "--";
+
+            if (chartEvolucion) chartEvolucion.destroy();
+            if (chartEvPromedio) chartEvPromedio.destroy();
+            if (chartDemografia) chartDemografia.destroy();
+            if (chartModalidades) chartModalidades.destroy();
+            if (chartDesercion) chartDesercion.destroy();
+
+            chartEvolucion = new Chart(
+              document.getElementById("chart-evolucion-matricula"),
+              {
+                type: "line",
+                data: {
+                  labels: res.evolucion.map((e) => e.periodo),
+                  datasets: [
+                    {
+                      label: "Alumnos Inscritos",
+                      data: res.evolucion.map((e) => e.total_inscritos),
+                      borderColor: "#4361ee",
+                      backgroundColor: "rgba(67, 97, 238, 0.2)",
+                      tension: 0.3,
+                      fill: true,
+                    },
+                  ],
+                },
+                options: { maintainAspectRatio: false },
+              },
+            );
+
+            chartEvPromedio = new Chart(
+              document.getElementById("chart-evolucion-promedio"),
+              {
+                type: "line",
+                data: {
+                  labels: res.evolucionPromedio.map((e) => e.periodo),
+                  datasets: [
+                    {
+                      label: "Promedio General",
+                      data: res.evolucionPromedio.map((e) => e.promedio),
+                      borderColor: "#198754",
+                      backgroundColor: "rgba(25, 135, 84, 0.1)",
+                      tension: 0.3,
+                      fill: true,
+                    },
+                  ],
+                },
+                options: { maintainAspectRatio: false },
+              },
+            );
+
+            chartDemografia = new Chart(
+              document.getElementById("chart-demografia"),
+              {
+                type: "doughnut",
+                data: {
+                  labels: res.demografia.map((d) => d.genero || "N/A"),
+                  datasets: [
+                    {
+                      data: res.demografia.map((d) => d.total),
+                      backgroundColor: ["#ec4899", "#3b82f6", "#8b5cf6"],
+                      borderWidth: 0,
+                    },
+                  ],
+                },
+                options: { maintainAspectRatio: false },
+              },
+            );
+
+            chartModalidades = new Chart(
+              document.getElementById("chart-modalidades"),
+              {
+                type: "pie",
+                data: {
+                  labels: res.modalidades.map((d) => d.modalidad || "N/A"),
+                  datasets: [
+                    {
+                      data: res.modalidades.map((d) => d.total),
+                      backgroundColor: [
+                        "#f59e0b",
+                        "#0ea5e9",
+                        "#10b981",
+                        "#8b5cf6",
+                      ],
+                      borderWidth: 0,
+                    },
+                  ],
+                },
+                options: {
+                  maintainAspectRatio: false,
+                  plugins: { legend: { position: "bottom" } },
+                },
+              },
+            );
+
+            chartDesercion = new Chart(
+              document.getElementById("chart-desercion"),
+              {
+                type: "doughnut",
+                data: {
+                  labels: res.desercion.map((d) => d.categoria),
+                  datasets: [
+                    {
+                      data: res.desercion.map((d) => d.total),
+                      backgroundColor: ["#dc3545", "#198754", "#0dcaf0"],
+                      borderWidth: 0,
+                    },
+                  ],
+                },
+                options: {
+                  maintainAspectRatio: false,
+                  plugins: { legend: { position: "bottom" } },
+                },
+              },
+            );
+
+            zona1Cargada = true;
+          } catch (error) {
+            console.error(error);
+          }
+        };
+
+        document
+          .getElementById("tab-global")
+          .addEventListener("shown.bs.tab", () => {
+            if (!zona1Cargada) cargarZona1();
+          });
+        document
+          .getElementById("btn-refresh-global")
+          .addEventListener("click", cargarZona1);
+        cargarZona1();
+
+        // ==========================================
+        // LAZY LOADING: ZONA 2 (PERIODO) - Intacta
+        // ==========================================
+        let chartGauss, chartAprobacion, chartTopMaterias, chartRegulares;
         const selectPeriodo = document.getElementById("dash-filtro-periodo");
         const selectSemestre = document.getElementById("dash-filtro-semestre");
         const btnAnalizar = document.getElementById("btn-analizar-periodo");
 
-        // 1. Cargar el catálogo de periodos en el filtro
-        try {
-          const periodos = await window.electronAPI.invoke("get-periodos");
+        window.electronAPI.invoke("get-periodos").then((periodos) => {
           selectPeriodo.innerHTML =
             '<option value="">Seleccione Periodo...</option>';
           periodos.forEach(
             (p) =>
               (selectPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`),
           );
-
-          // Seleccionar el periodo más reciente por defecto
           if (periodos.length > 0) selectPeriodo.value = periodos[0].id_periodo;
-        } catch (e) {
-          console.error(e);
-        }
+        });
 
-        // 2. Evento del Botón Analizar
         btnAnalizar.addEventListener("click", async () => {
           const id_periodo = selectPeriodo.value;
           const semestre = selectSemestre.value;
-          if (!id_periodo)
-            return window.electronAPI.invoke(
-              "dialog-alert",
-              "Por favor, selecciona un Periodo Escolar.",
-            );
+          if (!id_periodo) return;
 
           try {
             const originalText = btnAnalizar.innerHTML;
             btnAnalizar.innerHTML =
               '<span class="spinner-border spinner-border-sm me-2"></span> Calculando...';
-            btnAnalizar.disabled = true;
-
             const res = await window.electronAPI.invoke("get-dashboard-zona2", {
               id_periodo,
               semestre,
             });
 
-            // --- A. ACTUALIZAR KPIs GIGANTES ---
             document.getElementById("kpi-inscritos-periodo").textContent =
               res.kpis.total_alumnos || 0;
             document.getElementById("kpi-promedio-periodo").textContent = res
               .kpis.promedio_general
               ? parseFloat(res.kpis.promedio_general).toFixed(1)
               : "--";
-
             const totalMat = res.kpis.total_materias || 0;
             const reprobadas = res.kpis.reprobadas || 0;
-            const indiceRep =
-              totalMat > 0 ? ((reprobadas / totalMat) * 100).toFixed(1) : 0;
             document.getElementById("kpi-reprobacion-periodo").textContent =
-              `${indiceRep}%`;
+              totalMat > 0
+                ? `${((reprobadas / totalMat) * 100).toFixed(1)}%`
+                : "0%";
 
-            // --- B. DESTRUIR GRÁFICAS VIEJAS (Evita que se encimen) ---
             if (chartGauss) chartGauss.destroy();
             if (chartAprobacion) chartAprobacion.destroy();
             if (chartTopMaterias) chartTopMaterias.destroy();
             if (chartRegulares) chartRegulares.destroy();
 
-            // --- C. DIBUJAR GRÁFICAS ---
-
-            // 1. Campana de Gauss (Barras)
             chartGauss = new Chart(
               document.getElementById("chart-campana-gauss"),
               {
@@ -495,9 +645,6 @@
                 },
               },
             );
-
-            // 2. Aprobación vs Reprobación (Pastel)
-            const aprobadas = totalMat - reprobadas;
             chartAprobacion = new Chart(
               document.getElementById("chart-aprobacion-periodo"),
               {
@@ -506,7 +653,7 @@
                   labels: ["Aprobadas", "Reprobadas (NA)"],
                   datasets: [
                     {
-                      data: [aprobadas, reprobadas],
+                      data: [totalMat - reprobadas, reprobadas],
                       backgroundColor: ["#198754", "#dc3545"],
                       borderWidth: 0,
                     },
@@ -515,48 +662,40 @@
                 options: { maintainAspectRatio: false },
               },
             );
-
-            // 3. Top Materias (Barras Horizontales)
-            const nombresMaterias = res.topMaterias.map(
-              (m) => m.nombre_materia,
-            );
-            const conteoMaterias = res.topMaterias.map((m) => m.reprobados);
             chartTopMaterias = new Chart(
               document.getElementById("chart-top-materias"),
               {
                 type: "bar",
                 data: {
                   labels:
-                    nombresMaterias.length > 0
-                      ? nombresMaterias
+                    res.topMaterias.length > 0
+                      ? res.topMaterias.map((m) => m.nombre_materia)
                       : ["No hay materias reprobadas"],
                   datasets: [
                     {
                       label: "Alumnos Reprobados",
-                      data: conteoMaterias.length > 0 ? conteoMaterias : [0],
+                      data:
+                        res.topMaterias.length > 0
+                          ? res.topMaterias.map((m) => m.reprobados)
+                          : [0],
                       backgroundColor: "#dc3545",
                       borderRadius: 4,
                     },
                   ],
                 },
                 options: {
-                  indexAxis: "y", // La vuelve horizontal
+                  indexAxis: "y",
                   maintainAspectRatio: false,
                   plugins: { legend: { display: false } },
                 },
               },
             );
-
-            // 4. Regulares vs Irregulares (Dona)
             chartRegulares = new Chart(
               document.getElementById("chart-regulares"),
               {
                 type: "doughnut",
                 data: {
-                  labels: [
-                    "Limpios (Regulares)",
-                    "Deben 1 o más (Irregulares)",
-                  ],
+                  labels: ["Limpios", "Irregulares"],
                   datasets: [
                     {
                       data: [
@@ -565,7 +704,6 @@
                       ],
                       backgroundColor: ["#0dcaf0", "#ffc107"],
                       borderWidth: 0,
-                      cutout: "70%", // Hace el agujero del centro más grande
                     },
                   ],
                 },
@@ -573,136 +711,49 @@
               },
             );
 
-            // Restaurar botón
-            btnAnalizar.innerHTML =
-              '<i class="bi bi-play-fill"></i> Analizar Periodo';
-            btnAnalizar.disabled = false;
+            btnAnalizar.innerHTML = originalText;
           } catch (error) {
             console.error(error);
-            await window.electronAPI.invoke(
-              "dialog-alert",
-              "Error al procesar datos: " + error.message,
-            );
-            btnAnalizar.innerHTML =
-              '<i class="bi bi-play-fill"></i> Analizar Periodo';
-            btnAnalizar.disabled = false;
           }
         });
 
-        // Autodisparar el cálculo si hay un periodo cargado
-        if (selectPeriodo.value) {
-          btnAnalizar.click();
-        }
-
         // ==========================================
-        // LAZY LOADING: ZONA 1 (GLOBAL)
+        // LAZY LOADING: ZONA 3 (MEGA EXPANSIÓN)
         // ==========================================
-        let chartEvolucion, chartDemografia;
-        let zona1Cargada = false;
-
-        const cargarZona1 = async () => {
-          const filtroAnos = document.getElementById("dash-filtro-anos").value;
-          try {
-            const res = await window.electronAPI.invoke(
-              "get-dashboard-zona1",
-              filtroAnos,
-            );
-
-            // KPIs
-            document.getElementById("kpi-matricula-viva").textContent =
-              res.kpis.matricula_viva || 0;
-            document.getElementById("kpi-egresados-historico").textContent =
-              res.kpis.egresados || 0;
-            document.getElementById("kpi-promedio-historico").textContent = res
-              .kpis.promedio_historico
-              ? parseFloat(res.kpis.promedio_historico).toFixed(1)
-              : "--";
-
-            // Destruir gráficas viejas
-            if (chartEvolucion) chartEvolucion.destroy();
-            if (chartDemografia) chartDemografia.destroy();
-
-            // Gráfica de Líneas: Evolución
-            chartEvolucion = new Chart(
-              document.getElementById("chart-evolucion-matricula"),
-              {
-                type: "line",
-                data: {
-                  labels: res.evolucion.map((e) => e.periodo),
-                  datasets: [
-                    {
-                      label: "Alumnos Inscritos",
-                      data: res.evolucion.map((e) => e.total_inscritos),
-                      borderColor: "#4361ee",
-                      backgroundColor: "rgba(67, 97, 238, 0.2)",
-                      tension: 0.3,
-                      fill: true,
-                    },
-                  ],
-                },
-                options: { maintainAspectRatio: false },
-              },
-            );
-
-            // Gráfica de Dona: Demografía
-            const demLabels = res.demografia.map(
-              (d) => d.genero || "No especificado",
-            );
-            const demData = res.demografia.map((d) => d.total);
-            chartDemografia = new Chart(
-              document.getElementById("chart-demografia"),
-              {
-                type: "doughnut",
-                data: {
-                  labels: demLabels,
-                  datasets: [
-                    {
-                      data: demData,
-                      backgroundColor: ["#ec4899", "#3b82f6", "#8b5cf6"],
-                      borderWidth: 0,
-                      cutout: "70%",
-                    },
-                  ],
-                },
-                options: { maintainAspectRatio: false },
-              },
-            );
-            zona1Cargada = true;
-          } catch (error) {
-            console.error(error);
-          }
-        };
-
-        // Escuchar el clic en la pestaña para hacer Lazy Load
-        document
-          .getElementById("tab-global")
-          .addEventListener("shown.bs.tab", () => {
-            if (!zona1Cargada) cargarZona1();
-          });
-        document
-          .getElementById("btn-refresh-global")
-          .addEventListener("click", cargarZona1);
-
-        // Autocargar Zona 1 al inicio porque es la pestaña que se ve por defecto
-        cargarZona1();
-
-        // ==========================================
-        // LAZY LOADING: ZONA 3 (MICRO)
-        // ==========================================
-        let chartCompetencias, chartAcreditacion;
+        let chartCompetencias,
+          chartAcreditacion,
+          chartMicroGauss,
+          chartMicroReg;
         const microPeriodo = document.getElementById("dash-micro-periodo");
         const microMateria = document.getElementById("dash-micro-materia");
         const microGrupo = document.getElementById("dash-micro-grupo");
 
-        // Llenar catálogos
-        microPeriodo.innerHTML = selectPeriodo.innerHTML; // Clonamos los periodos
+        // 1. Cargar Periodos Directo de la BD
+        window.electronAPI.invoke("get-periodos").then((periodos) => {
+          microPeriodo.innerHTML =
+            '<option value="">Seleccione Periodo...</option>';
+          periodos.forEach((p) => {
+            microPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`;
+          });
+
+          // AUTO-SELECCIONAR EL PRIMER PERIODO Y DISPARAR LA CARGA DE GRUPOS
+          if (periodos.length > 0) {
+            microPeriodo.value = periodos[0].id_periodo;
+            microPeriodo.dispatchEvent(new Event("change"));
+          }
+        });
+
+        // 2. Cargar Materias Directo de la BD
         window.electronAPI.invoke("get-materias").then((mats) => {
+          microMateria.innerHTML =
+            '<option value="">Seleccione Materia...</option>';
           mats.forEach(
             (m) =>
               (microMateria.innerHTML += `<option value="${m.id_materia}">${m.nombre_materia}</option>`),
           );
         });
 
+        // 3. Cuando cambia el periodo, carga los grupos (AQUÍ ESTÁ EL BLOQUE REESCRITO)
         microPeriodo.addEventListener("change", async (e) => {
           microGrupo.innerHTML =
             '<option value="todos">Todos los grupos</option>';
@@ -730,19 +781,35 @@
                 "Selecciona Periodo y Materia.",
               );
 
-            document.getElementById("lbl-micro-materia").textContent =
-              microMateria.options[microMateria.selectedIndex].text;
-
             try {
               const res = await window.electronAPI.invoke(
                 "get-dashboard-zona3",
                 { id_periodo, id_materia, id_grupo },
               );
 
+              // Llenar KPIs Grupales
+              document.getElementById("kpi-micro-total").textContent =
+                res.kpis.total_evaluados || 0;
+              document.getElementById("kpi-micro-promedio").textContent = res
+                .kpis.promedio_grupal
+                ? parseFloat(res.kpis.promedio_grupal).toFixed(1)
+                : "--";
+              const aprobados =
+                (res.kpis.total_evaluados || 0) -
+                (res.kpis.total_reprobados || 0);
+              const porcentaje =
+                res.kpis.total_evaluados > 0
+                  ? ((aprobados / res.kpis.total_evaluados) * 100).toFixed(1)
+                  : 0;
+              document.getElementById("kpi-micro-aprobacion").textContent =
+                `${porcentaje}%`;
+
               if (chartCompetencias) chartCompetencias.destroy();
               if (chartAcreditacion) chartAcreditacion.destroy();
+              if (chartMicroGauss) chartMicroGauss.destroy();
+              if (chartMicroReg) chartMicroReg.destroy();
 
-              // Gráfica de Barras: Competencias
+              // Gráfica: Competencias
               const compValues = [];
               const compLabels = [];
               for (let i = 1; i <= 8; i++) {
@@ -751,7 +818,6 @@
                   compValues.push(res.competencias[`c${i}`]);
                 }
               }
-
               chartCompetencias = new Chart(
                 document.getElementById("chart-competencias"),
                 {
@@ -761,10 +827,9 @@
                       compLabels.length > 0 ? compLabels : ["Sin captura"],
                     datasets: [
                       {
-                        label: "Promedio Grupal",
+                        label: "Promedio",
                         data: compValues.length > 0 ? compValues : [0],
                         backgroundColor: "#0dcaf0",
-                        borderRadius: 4,
                       },
                     ],
                   },
@@ -772,38 +837,127 @@
                 },
               );
 
-              // Gráfica de Dona: Acreditación
-              let cn = 0,
-                so = 0,
-                ci = 0;
-              res.acreditacion.forEach((a) => {
-                if (a.tipo_acreditacion === "CN") cn = a.total;
-                if (a.tipo_acreditacion === "SO") so = a.total;
-                if (a.tipo_acreditacion === "CI") ci = a.total;
-              });
-
-              document.getElementById("micro-val-cn").textContent = cn;
-              document.getElementById("micro-val-so").textContent = so;
-              document.getElementById("micro-val-ci").textContent = ci;
-
+              // Gráfica: Acreditación
               chartAcreditacion = new Chart(
                 document.getElementById("chart-acreditacion"),
                 {
                   type: "doughnut",
                   data: {
-                    labels: ["Normal (CN)", "Segunda (SO)", "Verano (CI)"],
+                    labels: res.acreditacion.map((a) => a.tipo_acreditacion),
                     datasets: [
                       {
-                        data: [cn, so, ci],
+                        data: res.acreditacion.map((a) => a.total),
                         backgroundColor: ["#198754", "#ffc107", "#0dcaf0"],
                         borderWidth: 0,
-                        cutout: "70%",
+                      },
+                    ],
+                  },
+                  options: {
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "bottom" } },
+                  },
+                },
+              );
+
+              // PROCESAMIENTO DE DATOS EN VIVO (Gauss Grupal y Listas)
+              let na = 0,
+                reg = 0,
+                bno = 0,
+                exc = 0;
+              let topHtml = "",
+                bottomHtml = "";
+
+              res.alumnos.forEach((a, index) => {
+                const c = a.calificacion_final;
+                // Clasificar para Gauss
+                if (c < 70) na++;
+                else if (c < 80) reg++;
+                else if (c < 90) bno++;
+                else exc++;
+
+                // Los 5 Mejores
+                if (index < 5 && c >= 70) {
+                  topHtml += `<li class="list-group-item bg-transparent text-white px-0 d-flex justify-content-between"><span class="small text-truncate w-75">${a.nombre} ${a.apellido_paterno}</span> <span class="badge bg-success rounded-pill">${c}</span></li>`;
+                }
+              });
+
+              // Los Reprobados (Filtrados)
+              const reprobadosArr = res.alumnos.filter(
+                (a) => a.calificacion_final < 70,
+              );
+              reprobadosArr.forEach((a) => {
+                bottomHtml += `<li class="list-group-item bg-transparent text-white px-0 d-flex justify-content-between"><span class="small text-truncate w-75 font-monospace">${a.numero_control} | ${a.nombre}</span> <span class="badge bg-danger rounded-pill">${a.calificacion_final}</span></li>`;
+              });
+
+              document.getElementById("list-micro-top").innerHTML =
+                topHtml ||
+                '<li class="list-group-item bg-transparent text-muted small px-0">No hay aprobados registrados.</li>';
+              document.getElementById("list-micro-bottom").innerHTML =
+                bottomHtml ||
+                '<li class="list-group-item bg-transparent text-muted small px-0"><i class="bi bi-emoji-smile"></i> ¡Felicidades! Cero reprobados.</li>';
+
+              // Gráfica: Gauss Docente
+              chartMicroGauss = new Chart(
+                document.getElementById("chart-micro-gauss"),
+                {
+                  type: "bar",
+                  data: {
+                    labels: [
+                      "NA (<70)",
+                      "Regular (70-79)",
+                      "Bueno (80-89)",
+                      "Excelente (90-100)",
+                    ],
+                    datasets: [
+                      {
+                        label: "Alumnos",
+                        data: [na, reg, bno, exc],
+                        backgroundColor: [
+                          "#dc3545",
+                          "#fd7e14",
+                          "#0dcaf0",
+                          "#198754",
+                        ],
                       },
                     ],
                   },
                   options: {
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
+                  },
+                },
+              );
+
+              // Gráfica: Regularidad (Intentos)
+              let int1 = 0,
+                int2 = 0,
+                int3 = 0;
+              res.intentos.forEach((i) => {
+                if (i.num_intento === 1) int1++;
+                else if (i.num_intento === 2) int2++;
+                else int3++;
+              });
+              chartMicroReg = new Chart(
+                document.getElementById("chart-micro-regularidad"),
+                {
+                  type: "doughnut",
+                  data: {
+                    labels: [
+                      "Normal (1er Intento)",
+                      "Recurse (2do Intento)",
+                      "Especial (3+ Intentos)",
+                    ],
+                    datasets: [
+                      {
+                        data: [int1, int2, int3],
+                        backgroundColor: ["#198754", "#ffc107", "#dc3545"],
+                        borderWidth: 0,
+                      },
+                    ],
+                  },
+                  options: {
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "bottom" } },
                   },
                 },
               );

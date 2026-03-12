@@ -61,10 +61,9 @@
     style="overflow-y: auto; overflow-x: hidden; padding-right: 5px"
   >
     <div
-      class="tab-pane fade show active pb-4 h-100"
+      class="tab-pane fade show active pb-4"
       id="panel-global"
       role="tabpanel"
-      style="overflow-y: auto; overflow-x: hidden"
     >
       <div class="card bg-dark border-0 shadow-sm mb-3">
         <div class="card-body py-2 d-flex align-items-center gap-3">
@@ -94,6 +93,11 @@
             <div class="card-body text-center">
               <h6 class="text-primary text-uppercase fw-bold mb-1">
                 Matrícula Viva Total
+                <i
+                  class="bi bi-question-circle text-muted ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Alumnos en estado Activo o Baja Temporal en este momento."
+                ></i>
               </h6>
               <h2
                 class="display-5 fw-bold text-white mb-0"
@@ -101,7 +105,6 @@
               >
                 --
               </h2>
-              <small class="text-muted">Activos + Bajas Temporales</small>
             </div>
           </div>
         </div>
@@ -110,6 +113,11 @@
             <div class="card-body text-center">
               <h6 class="text-success text-uppercase fw-bold mb-1">
                 Total Egresados/Titulados
+                <i
+                  class="bi bi-question-circle text-muted ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Acumulado histórico de todos los que han terminado la carrera."
+                ></i>
               </h6>
               <h2
                 class="display-5 fw-bold text-white mb-0"
@@ -117,7 +125,6 @@
               >
                 --
               </h2>
-              <small class="text-muted">Acumulado histórico</small>
             </div>
           </div>
         </div>
@@ -126,6 +133,11 @@
             <div class="card-body text-center">
               <h6 class="text-info text-uppercase fw-bold mb-1">
                 Promedio Histórico
+                <i
+                  class="bi bi-question-circle text-muted ms-1"
+                  data-bs-toggle="tooltip"
+                  title="El promedio general de toda la carrera desde que inició."
+                ></i>
               </h6>
               <h2
                 class="display-5 fw-bold text-white mb-0"
@@ -133,47 +145,106 @@
               >
                 --
               </h2>
-              <small class="text-muted">General de la carrera</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">
+                Evolución de Matrícula
+                <i
+                  class="bi bi-question-circle text-muted ms-1"
+                  data-bs-toggle="tooltip"
+                  title="¿La escuela está atrayendo más alumnos o perdiéndolos con el tiempo?"
+                ></i>
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="height: 280px">
+              <canvas id="chart-evolucion-matricula"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">
+                Tendencia del Promedio Académico
+                <i
+                  class="bi bi-question-circle text-muted ms-1"
+                  data-bs-toggle="tooltip"
+                  title="¿El rendimiento general sube o baja conforme pasan los años?"
+                ></i>
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="height: 280px">
+              <canvas id="chart-evolucion-promedio"></canvas>
             </div>
           </div>
         </div>
       </div>
 
       <div class="row g-3">
-        <div class="col-md-8">
+        <div class="col-md-4">
           <div class="card border-0 shadow-sm h-100">
             <div class="card-header border-0 bg-transparent pt-3">
               <h6 class="mb-0 fw-bold text-muted">
-                Evolución de Matrícula y Egreso
+                Demografía
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Distribución por género histórico."
+                ></i>
               </h6>
             </div>
-            <div class="card-body position-relative" style="height: 350px">
-              <canvas id="chart-evolucion-matricula"></canvas>
+            <div class="card-body position-relative" style="height: 250px">
+              <canvas id="chart-demografia"></canvas>
             </div>
           </div>
         </div>
         <div class="col-md-4">
           <div class="card border-0 shadow-sm h-100">
             <div class="card-header border-0 bg-transparent pt-3">
-              <h6 class="mb-0 fw-bold text-muted">Demografía Institucional</h6>
+              <h6 class="mb-0 fw-bold text-muted">
+                Modalidades de Titulación
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="¿Por qué método se están titulando más los alumnos?"
+                ></i>
+              </h6>
             </div>
-            <div
-              class="card-body position-relative d-flex justify-content-center align-items-center"
-              style="height: 350px"
-            >
-              <canvas id="chart-demografia"></canvas>
+            <div class="card-body position-relative" style="height: 250px">
+              <canvas id="chart-modalidades"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div
+            class="card border-0 shadow-sm h-100 border-bottom border-4 border-danger"
+          >
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">
+                Semáforo de Deserción
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Del 100% de alumnos inscritos en la historia, ¿cuántos desertaron?"
+                ></i>
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="height: 250px">
+              <canvas id="chart-desercion"></canvas>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div
-      class="tab-pane fade pb-4 h-100"
-      id="panel-periodo"
-      role="tabpanel"
-      style="overflow-y: auto; overflow-x: hidden"
-    >
+    <div class="tab-pane fade pb-4" id="panel-periodo" role="tabpanel">
       <div class="card bg-dark border-0 shadow-sm mb-3">
         <div class="card-body py-2 d-flex flex-wrap align-items-center gap-3">
           <label class="text-muted small fw-bold mb-0"
@@ -219,8 +290,13 @@
             >
               <div>
                 <small class="text-muted text-uppercase fw-bold"
-                  >Alumnos Inscritos</small
-                >
+                  >Alumnos Inscritos
+                  <i
+                    class="bi bi-question-circle text-muted ms-1"
+                    data-bs-toggle="tooltip"
+                    title="Alumnos cursando al menos una materia este periodo."
+                  ></i
+                ></small>
                 <h3 class="fw-bold mb-0" id="kpi-inscritos-periodo">--</h3>
               </div>
               <i class="bi bi-people fs-1 text-info opacity-50"></i>
@@ -236,8 +312,13 @@
             >
               <div>
                 <small class="text-muted text-uppercase fw-bold"
-                  >Promedio General</small
-                >
+                  >Promedio General
+                  <i
+                    class="bi bi-question-circle text-muted ms-1"
+                    data-bs-toggle="tooltip"
+                    title="El promedio de las materias aprobadas en este periodo."
+                  ></i
+                ></small>
                 <h3 class="fw-bold mb-0" id="kpi-promedio-periodo">--</h3>
               </div>
               <i class="bi bi-bar-chart-line fs-1 text-success opacity-50"></i>
@@ -253,8 +334,13 @@
             >
               <div>
                 <small class="text-muted text-uppercase fw-bold"
-                  >Índice Reprobación</small
-                >
+                  >Índice Reprobación
+                  <i
+                    class="bi bi-question-circle text-muted ms-1"
+                    data-bs-toggle="tooltip"
+                    title="% de materias que terminaron en NA."
+                  ></i
+                ></small>
                 <h3
                   class="fw-bold text-danger mb-0"
                   id="kpi-reprobacion-periodo"
@@ -275,7 +361,12 @@
           <div class="card border-0 shadow-sm h-100">
             <div class="card-header border-0 bg-transparent pt-3">
               <h6 class="mb-0 fw-bold text-muted">
-                Distribución de Calificaciones (Campana de Gauss)
+                Distribución de Calificaciones
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Agrupa TODAS las calificaciones del periodo por nivel de desempeño."
+                ></i>
               </h6>
             </div>
             <div class="card-body position-relative" style="height: 280px">
@@ -287,13 +378,15 @@
           <div class="card border-0 shadow-sm h-100">
             <div class="card-header border-0 bg-transparent pt-3">
               <h6 class="mb-0 fw-bold text-muted">
-                Aprobación vs. Reprobación (NA)
+                Aprobación vs. Reprobación
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Tasa de éxito vs Fracaso escolar del semestre."
+                ></i>
               </h6>
             </div>
-            <div
-              class="card-body position-relative d-flex justify-content-center align-items-center"
-              style="height: 280px"
-            >
+            <div class="card-body position-relative" style="height: 280px">
               <canvas id="chart-aprobacion-periodo"></canvas>
             </div>
           </div>
@@ -305,8 +398,13 @@
           <div class="card border-0 shadow-sm h-100">
             <div class="card-header border-0 bg-transparent pt-3">
               <h6 class="mb-0 fw-bold text-danger">
-                <i class="bi bi-fire me-2"></i>Top 5 Materias con mayor índice
-                de Reprobación
+                <i class="bi bi-fire me-2"></i>Top 5 Materias con mayor
+                reprobación
+                <i
+                  class="bi bi-question-circle text-muted ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Los cuellos de botella de la carrera en este periodo."
+                ></i>
               </h6>
             </div>
             <div class="card-body position-relative" style="height: 320px">
@@ -317,12 +415,16 @@
         <div class="col-md-4">
           <div class="card border-0 shadow-sm h-100">
             <div class="card-header border-0 bg-transparent pt-3">
-              <h6 class="mb-0 fw-bold text-muted">Regulares vs. Irregulares</h6>
+              <h6 class="mb-0 fw-bold text-muted">
+                Regularidad Estudiantil
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="¿Cuántos alumnos van limpios y cuántos arrastran materias?"
+                ></i>
+              </h6>
             </div>
-            <div
-              class="card-body position-relative d-flex justify-content-center align-items-center"
-              style="height: 320px"
-            >
+            <div class="card-body position-relative" style="height: 320px">
               <canvas id="chart-regulares"></canvas>
             </div>
           </div>
@@ -330,16 +432,14 @@
       </div>
     </div>
 
-    <div
-      class="tab-pane fade pb-4 h-100"
-      id="panel-micro"
-      role="tabpanel"
-      style="overflow-y: auto; overflow-x: hidden"
-    >
-      <div class="card bg-dark border-0 shadow-sm mb-3">
+    <div class="tab-pane fade pb-4" id="panel-micro" role="tabpanel">
+      <div
+        class="card bg-dark border-0 shadow-sm mb-3 position-sticky top-0"
+        style="z-index: 10"
+      >
         <div class="card-body py-2 d-flex flex-wrap align-items-center gap-3">
           <label class="text-muted small fw-bold mb-0"
-            ><i class="bi bi-search"></i> Lupa Docente:</label
+            ><i class="bi bi-search"></i> Filtros de Análisis:</label
           >
           <select
             id="dash-micro-periodo"
@@ -365,23 +465,68 @@
         </div>
       </div>
 
-      <div class="row g-3">
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <div
+            class="card border-0 shadow-sm bg-dark border-start border-4 border-info h-100"
+          >
+            <div class="card-body py-2 text-center">
+              <small class="text-muted text-uppercase fw-bold"
+                >Promedio Final del Grupo</small
+              >
+              <h2 class="fw-bold text-white mb-0 mt-1" id="kpi-micro-promedio">
+                --
+              </h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div
+            class="card border-0 shadow-sm bg-dark border-start border-4 border-success h-100"
+          >
+            <div class="card-body py-2 text-center">
+              <small class="text-muted text-uppercase fw-bold"
+                >Tasa de Aprobación</small
+              >
+              <h2
+                class="fw-bold text-success mb-0 mt-1"
+                id="kpi-micro-aprobacion"
+              >
+                --%
+              </h2>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div
+            class="card border-0 shadow-sm bg-dark border-start border-4 border-secondary h-100"
+          >
+            <div class="card-body py-2 text-center">
+              <small class="text-muted text-uppercase fw-bold"
+                >Alumnos Evaluados</small
+              >
+              <h2 class="fw-bold text-white mb-0 mt-1" id="kpi-micro-total">
+                --
+              </h2>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
         <div class="col-md-8">
           <div class="card border-0 shadow-sm h-100">
-            <div
-              class="card-header border-0 bg-transparent pt-3 d-flex justify-content-between"
-            >
+            <div class="card-header border-0 bg-transparent pt-3">
               <h6 class="mb-0 fw-bold text-muted">
-                Mapa de Supervivencia por Competencias (C1 - C8)
+                Mapa de Competencias
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Ayuda a detectar en qué unidad específica reprobó el grupo."
+                ></i>
               </h6>
-              <span class="badge bg-secondary" id="lbl-micro-materia"
-                >Materia no seleccionada</span
-              >
             </div>
-            <div
-              class="card-body position-relative"
-              style="height: calc(100vh - 280px); min-height: 350px"
-            >
+            <div class="card-body position-relative" style="height: 300px">
               <canvas id="chart-competencias"></canvas>
             </div>
           </div>
@@ -389,40 +534,89 @@
         <div class="col-md-4">
           <div class="card border-0 shadow-sm h-100">
             <div class="card-header border-0 bg-transparent pt-3">
-              <h6 class="mb-0 fw-bold text-muted">Tipo de Acreditación</h6>
+              <h6 class="mb-0 fw-bold text-muted">
+                Tipo Acreditación
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="De los que pasaron, ¿cuántos fueron en 2da oportunidad?"
+                ></i>
+              </h6>
             </div>
-            <div
-              class="card-body d-flex flex-column p-3"
-              style="height: calc(100vh - 280px); min-height: 350px"
-            >
-              <div class="position-relative flex-grow-1" style="min-height: 0">
-                <canvas id="chart-acreditacion"></canvas>
-              </div>
-              <div
-                class="mt-3 text-center small text-muted w-100 flex-shrink-0 border-top border-secondary border-opacity-25 pt-3"
-              >
-                <div class="d-flex justify-content-between mb-1">
-                  <span class="text-white"
-                    ><i class="bi bi-circle-fill text-success me-1"></i> Normal
-                    (CN):</span
-                  >
-                  <span id="micro-val-cn" class="fw-bold">--</span>
-                </div>
-                <div class="d-flex justify-content-between mb-1">
-                  <span class="text-white"
-                    ><i class="bi bi-circle-fill text-warning me-1"></i> Segunda
-                    (SO):</span
-                  >
-                  <span id="micro-val-so" class="fw-bold">--</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                  <span class="text-white"
-                    ><i class="bi bi-circle-fill text-info me-1"></i> Verano
-                    (CI):</span
-                  >
-                  <span id="micro-val-ci" class="fw-bold">--</span>
-                </div>
-              </div>
+            <div class="card-body position-relative" style="height: 300px">
+              <canvas id="chart-acreditacion"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-muted">
+                Campana de Gauss Docente
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="¿Cómo distribuyó las calificaciones el profesor?"
+                ></i>
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="height: 280px">
+              <canvas id="chart-micro-gauss"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header border-0 bg-transparent pt-3">
+              <h6 class="mb-0 fw-bold text-warning">
+                Regularidad en el Aula
+                <i
+                  class="bi bi-question-circle ms-1"
+                  data-bs-toggle="tooltip"
+                  title="¿Cuántos alumnos están llevando esta materia por 2da vez (Recurse) o 3ra vez (Especial)?"
+                ></i>
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="height: 280px">
+              <canvas id="chart-micro-regularidad"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div
+            class="card border-0 shadow-sm h-100 border-top border-4 border-success bg-dark"
+          >
+            <div class="card-header border-0 bg-transparent pt-3 pb-0">
+              <h6 class="mb-0 fw-bold text-success">
+                <i class="bi bi-trophy-fill me-2"></i>Top 5: Alto Rendimiento
+              </h6>
+            </div>
+            <div class="card-body">
+              <ul class="list-group list-group-flush" id="list-micro-top"></ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div
+            class="card border-0 shadow-sm h-100 border-top border-4 border-danger bg-dark"
+          >
+            <div class="card-header border-0 bg-transparent pt-3 pb-0">
+              <h6 class="mb-0 fw-bold text-danger">
+                <i class="bi bi-exclamation-octagon-fill me-2"></i>Foco Rojo:
+                Reprobados
+              </h6>
+            </div>
+            <div class="card-body">
+              <ul
+                class="list-group list-group-flush"
+                id="list-micro-bottom"
+              ></ul>
             </div>
           </div>
         </div>

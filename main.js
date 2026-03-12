@@ -1232,7 +1232,6 @@ ipcMain.handle("get-dashboard-zona1", async (event, filtroAnos) => {
           db.all(sql, params, (err, rows) => (err ? rej(err) : res(rows))),
         );
 
-      // 1. KPIs Globales
       const kpis = await runGet(`
         SELECT 
           (SELECT COUNT(*) FROM Alumnos WHERE status IN ('Activo', 'Baja Temporal')) as matricula_viva,
@@ -1240,26 +1239,49 @@ ipcMain.handle("get-dashboard-zona1", async (event, filtroAnos) => {
           (SELECT AVG(calificacion_final) FROM Inscripciones WHERE calificacion_final >= 70) as promedio_historico
       `);
 
-      // 2. Evolución Histórica (Alumnos inscritos por periodo)
-      // Nota: Si hay filtro de años, limitamos la cantidad de periodos a mostrar
       let limitQuery =
         filtroAnos !== "todos" ? `LIMIT ${parseInt(filtroAnos) * 2}` : "";
+
       const evolucion = await runAll(`
         SELECT p.nombre as periodo, COUNT(DISTINCT i.id_alumno_fk) as total_inscritos
-        FROM Inscripciones i
-        JOIN PeriodosEscolares p ON i.id_periodo_fk = p.id_periodo
-        GROUP BY p.id_periodo
-        ORDER BY p.nombre DESC
-        ${limitQuery}
+        FROM Inscripciones i JOIN PeriodosEscolares p ON i.id_periodo_fk = p.id_periodo
+        GROUP BY p.id_periodo ORDER BY p.nombre DESC ${limitQuery}
       `);
 
-      // 3. Demografía (Género de todos los alumnos históricos)
-      const demografia = await runAll(`
-        SELECT genero, COUNT(*) as total FROM Alumnos GROUP BY genero
+      // NUEVO: Evolución del Promedio
+      const evolucionPromedio = await runAll(`
+        SELECT p.nombre as periodo, AVG(i.calificacion_final) as promedio
+        FROM Inscripciones i JOIN PeriodosEscolares p ON i.id_periodo_fk = p.id_periodo
+        WHERE i.calificacion_final >= 70
+        GROUP BY p.id_periodo ORDER BY p.nombre DESC ${limitQuery}
       `);
 
-      // Devolvemos la evolución ordenada cronológicamente (de más viejo a más nuevo)
-      resolve({ kpis, evolucion: evolucion.reverse(), demografia });
+      const demografia = await runAll(
+        `SELECT genero, COUNT(*) as total FROM Alumnos GROUP BY genero`,
+      );
+
+      // NUEVO: Modalidades y Deserción
+      const modalidades = await runAll(
+        `SELECT modalidad, COUNT(*) as total FROM Titulados GROUP BY modalidad`,
+      );
+      const desercion = await runAll(`
+        SELECT 
+          CASE 
+            WHEN status IN ('Activo', 'Baja Temporal') THEN 'Retención (Activos)'
+            WHEN status IN ('Egresado', 'Titulado') THEN 'Eficiencia (Egresados)'
+            ELSE 'Deserción (Bajas)'
+          END as categoria, COUNT(*) as total
+        FROM Alumnos GROUP BY categoria
+      `);
+
+      resolve({
+        kpis,
+        evolucion: evolucion.reverse(),
+        evolucionPromedio: evolucionPromedio.reverse(),
+        demografia,
+        modalidades,
+        desercion,
+      });
     } catch (error) {
       reject(error);
     }
@@ -1286,30 +1308,56 @@ ipcMain.handle("get-dashboard-zona3", async (event, data) => {
           ? [id_periodo, id_materia, id_grupo]
           : [id_periodo, id_materia];
 
-      // Promedios por Competencia (C1 a C8)
-      const competencias = await runGet(
+      // NUEVO: KPIs Grupales
+      const kpis = await runGet(
         `
         SELECT 
-          AVG(c1) as c1, AVG(c2) as c2, AVG(c3) as c3, AVG(c4) as c4,
-          AVG(c5) as c5, AVG(c6) as c6, AVG(c7) as c7, AVG(c8) as c8
-        FROM Inscripciones i
-        WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? ${joinGrp}
+          COUNT(i.id_inscripcion) as total_evaluados,
+          AVG(CASE WHEN i.calificacion_final >= 70 THEN i.calificacion_final ELSE NULL END) as promedio_grupal,
+          SUM(CASE WHEN i.estado_materia = 'Reprobada' OR i.calificacion_final < 70 THEN 1 ELSE 0 END) as total_reprobados
+        FROM Inscripciones i WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? ${joinGrp}
       `,
         params,
       );
 
-      // Distribución de Acreditación (CN, SO, CI)
+      const competencias = await runGet(
+        `
+        SELECT AVG(c1) as c1, AVG(c2) as c2, AVG(c3) as c3, AVG(c4) as c4, AVG(c5) as c5, AVG(c6) as c6, AVG(c7) as c7, AVG(c8) as c8
+        FROM Inscripciones i WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? ${joinGrp}
+      `,
+        params,
+      );
+
       const acreditacion = await runAll(
         `
         SELECT tipo_acreditacion, COUNT(*) as total 
-        FROM Inscripciones i 
-        WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? AND calificacion_final >= 70 ${joinGrp}
-        GROUP BY tipo_acreditacion
+        FROM Inscripciones i WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? AND calificacion_final >= 70 ${joinGrp} GROUP BY tipo_acreditacion
       `,
         params,
       );
 
-      resolve({ competencias, acreditacion });
+      // NUEVO: Lista cruda para Top, Reprobados y Campana
+      const alumnos = await runAll(
+        `
+        SELECT a.nombre, a.apellido_paterno, a.numero_control, i.calificacion_final
+        FROM Inscripciones i JOIN Alumnos a ON i.id_alumno_fk = a.id_alumno
+        WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? AND i.calificacion_final IS NOT NULL ${joinGrp}
+        ORDER BY i.calificacion_final DESC
+      `,
+        params,
+      );
+
+      // NUEVO: Regularidad (Subconsulta para ver en qué intento van)
+      const intentos = await runAll(
+        `
+        SELECT 
+          (SELECT COUNT(*) FROM Inscripciones sub WHERE sub.id_alumno_fk = i.id_alumno_fk AND sub.id_materia_fk = i.id_materia_fk AND sub.id_periodo_fk <= i.id_periodo_fk) as num_intento
+        FROM Inscripciones i WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? ${joinGrp}
+      `,
+        params,
+      );
+
+      resolve({ kpis, competencias, acreditacion, alumnos, intentos });
     } catch (error) {
       reject(error);
     }
