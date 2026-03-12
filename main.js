@@ -1218,3 +1218,100 @@ ipcMain.handle("get-dashboard-zona2", async (event, data) => {
     }
   });
 });
+
+// --- ZONA 1: VISIÓN GLOBAL E HISTÓRICA ---
+ipcMain.handle("get-dashboard-zona1", async (event, filtroAnos) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const runGet = (sql, params = []) =>
+        new Promise((res, rej) =>
+          db.get(sql, params, (err, row) => (err ? rej(err) : res(row))),
+        );
+      const runAll = (sql, params = []) =>
+        new Promise((res, rej) =>
+          db.all(sql, params, (err, rows) => (err ? rej(err) : res(rows))),
+        );
+
+      // 1. KPIs Globales
+      const kpis = await runGet(`
+        SELECT 
+          (SELECT COUNT(*) FROM Alumnos WHERE status IN ('Activo', 'Baja Temporal')) as matricula_viva,
+          (SELECT COUNT(*) FROM Alumnos WHERE status IN ('Egresado', 'Titulado')) as egresados,
+          (SELECT AVG(calificacion_final) FROM Inscripciones WHERE calificacion_final >= 70) as promedio_historico
+      `);
+
+      // 2. Evolución Histórica (Alumnos inscritos por periodo)
+      // Nota: Si hay filtro de años, limitamos la cantidad de periodos a mostrar
+      let limitQuery =
+        filtroAnos !== "todos" ? `LIMIT ${parseInt(filtroAnos) * 2}` : "";
+      const evolucion = await runAll(`
+        SELECT p.nombre as periodo, COUNT(DISTINCT i.id_alumno_fk) as total_inscritos
+        FROM Inscripciones i
+        JOIN PeriodosEscolares p ON i.id_periodo_fk = p.id_periodo
+        GROUP BY p.id_periodo
+        ORDER BY p.nombre DESC
+        ${limitQuery}
+      `);
+
+      // 3. Demografía (Género de todos los alumnos históricos)
+      const demografia = await runAll(`
+        SELECT genero, COUNT(*) as total FROM Alumnos GROUP BY genero
+      `);
+
+      // Devolvemos la evolución ordenada cronológicamente (de más viejo a más nuevo)
+      resolve({ kpis, evolucion: evolucion.reverse(), demografia });
+    } catch (error) {
+      reject(error);
+    }
+  });
+});
+
+// --- ZONA 3: ANÁLISIS MICRO (MATERIA) ---
+ipcMain.handle("get-dashboard-zona3", async (event, data) => {
+  const { id_periodo, id_materia, id_grupo } = data;
+  return new Promise(async (resolve, reject) => {
+    try {
+      const runGet = (sql, params) =>
+        new Promise((res, rej) =>
+          db.get(sql, params, (err, row) => (err ? rej(err) : res(row))),
+        );
+      const runAll = (sql, params) =>
+        new Promise((res, rej) =>
+          db.all(sql, params, (err, rows) => (err ? rej(err) : res(rows))),
+        );
+
+      let joinGrp = id_grupo !== "todos" ? " AND i.id_grupo_fk = ?" : "";
+      let params =
+        id_grupo !== "todos"
+          ? [id_periodo, id_materia, id_grupo]
+          : [id_periodo, id_materia];
+
+      // Promedios por Competencia (C1 a C8)
+      const competencias = await runGet(
+        `
+        SELECT 
+          AVG(c1) as c1, AVG(c2) as c2, AVG(c3) as c3, AVG(c4) as c4,
+          AVG(c5) as c5, AVG(c6) as c6, AVG(c7) as c7, AVG(c8) as c8
+        FROM Inscripciones i
+        WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? ${joinGrp}
+      `,
+        params,
+      );
+
+      // Distribución de Acreditación (CN, SO, CI)
+      const acreditacion = await runAll(
+        `
+        SELECT tipo_acreditacion, COUNT(*) as total 
+        FROM Inscripciones i 
+        WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? AND calificacion_final >= 70 ${joinGrp}
+        GROUP BY tipo_acreditacion
+      `,
+        params,
+      );
+
+      resolve({ competencias, acreditacion });
+    } catch (error) {
+      reject(error);
+    }
+  });
+});

@@ -147,7 +147,7 @@
                 Evolución de Matrícula y Egreso
               </h6>
             </div>
-            <div class="card-body position-relative" style="min-height: 300px">
+            <div class="card-body position-relative" style="height: 350px">
               <canvas id="chart-evolucion-matricula"></canvas>
             </div>
           </div>
@@ -159,7 +159,7 @@
             </div>
             <div
               class="card-body position-relative d-flex justify-content-center align-items-center"
-              style="min-height: 300px"
+              style="height: 350px"
             >
               <canvas id="chart-demografia"></canvas>
             </div>
@@ -278,7 +278,7 @@
                 Distribución de Calificaciones (Campana de Gauss)
               </h6>
             </div>
-            <div class="card-body position-relative" style="min-height: 250px">
+            <div class="card-body position-relative" style="height: 280px">
               <canvas id="chart-campana-gauss"></canvas>
             </div>
           </div>
@@ -292,7 +292,7 @@
             </div>
             <div
               class="card-body position-relative d-flex justify-content-center align-items-center"
-              style="min-height: 250px"
+              style="height: 280px"
             >
               <canvas id="chart-aprobacion-periodo"></canvas>
             </div>
@@ -309,7 +309,7 @@
                 de Reprobación
               </h6>
             </div>
-            <div class="card-body position-relative" style="min-height: 300px">
+            <div class="card-body position-relative" style="height: 320px">
               <canvas id="chart-top-materias"></canvas>
             </div>
           </div>
@@ -321,7 +321,7 @@
             </div>
             <div
               class="card-body position-relative d-flex justify-content-center align-items-center"
-              style="min-height: 300px"
+              style="height: 320px"
             >
               <canvas id="chart-regulares"></canvas>
             </div>
@@ -378,7 +378,10 @@
                 >Materia no seleccionada</span
               >
             </div>
-            <div class="card-body position-relative" style="min-height: 350px">
+            <div
+              class="card-body position-relative"
+              style="height: calc(100vh - 280px); min-height: 350px"
+            >
               <canvas id="chart-competencias"></canvas>
             </div>
           </div>
@@ -389,31 +392,35 @@
               <h6 class="mb-0 fw-bold text-muted">Tipo de Acreditación</h6>
             </div>
             <div
-              class="card-body position-relative d-flex justify-content-center align-items-center flex-column"
-              style="min-height: 350px"
+              class="card-body d-flex flex-column p-3"
+              style="height: calc(100vh - 280px); min-height: 350px"
             >
-              <canvas id="chart-acreditacion"></canvas>
-              <div class="mt-4 text-center small text-muted w-100 px-3">
+              <div class="position-relative flex-grow-1" style="min-height: 0">
+                <canvas id="chart-acreditacion"></canvas>
+              </div>
+              <div
+                class="mt-3 text-center small text-muted w-100 flex-shrink-0 border-top border-secondary border-opacity-25 pt-3"
+              >
                 <div class="d-flex justify-content-between mb-1">
                   <span class="text-white"
                     ><i class="bi bi-circle-fill text-success me-1"></i> Normal
                     (CN):</span
                   >
-                  <span id="micro-val-cn">--</span>
+                  <span id="micro-val-cn" class="fw-bold">--</span>
                 </div>
                 <div class="d-flex justify-content-between mb-1">
                   <span class="text-white"
                     ><i class="bi bi-circle-fill text-warning me-1"></i> Segunda
                     (SO):</span
                   >
-                  <span id="micro-val-so">--</span>
+                  <span id="micro-val-so" class="fw-bold">--</span>
                 </div>
                 <div class="d-flex justify-content-between">
                   <span class="text-white"
                     ><i class="bi bi-circle-fill text-info me-1"></i> Verano
                     (CI):</span
                   >
-                  <span id="micro-val-ci">--</span>
+                  <span id="micro-val-ci" class="fw-bold">--</span>
                 </div>
               </div>
             </div>

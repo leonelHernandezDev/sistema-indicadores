@@ -593,6 +593,224 @@
         if (selectPeriodo.value) {
           btnAnalizar.click();
         }
+
+        // ==========================================
+        // LAZY LOADING: ZONA 1 (GLOBAL)
+        // ==========================================
+        let chartEvolucion, chartDemografia;
+        let zona1Cargada = false;
+
+        const cargarZona1 = async () => {
+          const filtroAnos = document.getElementById("dash-filtro-anos").value;
+          try {
+            const res = await window.electronAPI.invoke(
+              "get-dashboard-zona1",
+              filtroAnos,
+            );
+
+            // KPIs
+            document.getElementById("kpi-matricula-viva").textContent =
+              res.kpis.matricula_viva || 0;
+            document.getElementById("kpi-egresados-historico").textContent =
+              res.kpis.egresados || 0;
+            document.getElementById("kpi-promedio-historico").textContent = res
+              .kpis.promedio_historico
+              ? parseFloat(res.kpis.promedio_historico).toFixed(1)
+              : "--";
+
+            // Destruir gráficas viejas
+            if (chartEvolucion) chartEvolucion.destroy();
+            if (chartDemografia) chartDemografia.destroy();
+
+            // Gráfica de Líneas: Evolución
+            chartEvolucion = new Chart(
+              document.getElementById("chart-evolucion-matricula"),
+              {
+                type: "line",
+                data: {
+                  labels: res.evolucion.map((e) => e.periodo),
+                  datasets: [
+                    {
+                      label: "Alumnos Inscritos",
+                      data: res.evolucion.map((e) => e.total_inscritos),
+                      borderColor: "#4361ee",
+                      backgroundColor: "rgba(67, 97, 238, 0.2)",
+                      tension: 0.3,
+                      fill: true,
+                    },
+                  ],
+                },
+                options: { maintainAspectRatio: false },
+              },
+            );
+
+            // Gráfica de Dona: Demografía
+            const demLabels = res.demografia.map(
+              (d) => d.genero || "No especificado",
+            );
+            const demData = res.demografia.map((d) => d.total);
+            chartDemografia = new Chart(
+              document.getElementById("chart-demografia"),
+              {
+                type: "doughnut",
+                data: {
+                  labels: demLabels,
+                  datasets: [
+                    {
+                      data: demData,
+                      backgroundColor: ["#ec4899", "#3b82f6", "#8b5cf6"],
+                      borderWidth: 0,
+                      cutout: "70%",
+                    },
+                  ],
+                },
+                options: { maintainAspectRatio: false },
+              },
+            );
+            zona1Cargada = true;
+          } catch (error) {
+            console.error(error);
+          }
+        };
+
+        // Escuchar el clic en la pestaña para hacer Lazy Load
+        document
+          .getElementById("tab-global")
+          .addEventListener("shown.bs.tab", () => {
+            if (!zona1Cargada) cargarZona1();
+          });
+        document
+          .getElementById("btn-refresh-global")
+          .addEventListener("click", cargarZona1);
+
+        // Autocargar Zona 1 al inicio porque es la pestaña que se ve por defecto
+        cargarZona1();
+
+        // ==========================================
+        // LAZY LOADING: ZONA 3 (MICRO)
+        // ==========================================
+        let chartCompetencias, chartAcreditacion;
+        const microPeriodo = document.getElementById("dash-micro-periodo");
+        const microMateria = document.getElementById("dash-micro-materia");
+        const microGrupo = document.getElementById("dash-micro-grupo");
+
+        // Llenar catálogos
+        microPeriodo.innerHTML = selectPeriodo.innerHTML; // Clonamos los periodos
+        window.electronAPI.invoke("get-materias").then((mats) => {
+          mats.forEach(
+            (m) =>
+              (microMateria.innerHTML += `<option value="${m.id_materia}">${m.nombre_materia}</option>`),
+          );
+        });
+
+        microPeriodo.addEventListener("change", async (e) => {
+          microGrupo.innerHTML =
+            '<option value="todos">Todos los grupos</option>';
+          if (!e.target.value) return;
+          const grupos = await window.electronAPI.invoke(
+            "get-grupos-por-periodo",
+            e.target.value,
+          );
+          grupos.forEach(
+            (g) =>
+              (microGrupo.innerHTML += `<option value="${g.id_grupo}">${g.nombre_grupo}</option>`),
+          );
+        });
+
+        document
+          .getElementById("btn-analizar-micro")
+          .addEventListener("click", async () => {
+            const id_periodo = microPeriodo.value;
+            const id_materia = microMateria.value;
+            const id_grupo = microGrupo.value;
+
+            if (!id_periodo || !id_materia)
+              return window.electronAPI.invoke(
+                "dialog-alert",
+                "Selecciona Periodo y Materia.",
+              );
+
+            document.getElementById("lbl-micro-materia").textContent =
+              microMateria.options[microMateria.selectedIndex].text;
+
+            try {
+              const res = await window.electronAPI.invoke(
+                "get-dashboard-zona3",
+                { id_periodo, id_materia, id_grupo },
+              );
+
+              if (chartCompetencias) chartCompetencias.destroy();
+              if (chartAcreditacion) chartAcreditacion.destroy();
+
+              // Gráfica de Barras: Competencias
+              const compValues = [];
+              const compLabels = [];
+              for (let i = 1; i <= 8; i++) {
+                if (res.competencias[`c${i}`] !== null) {
+                  compLabels.push(`C${i}`);
+                  compValues.push(res.competencias[`c${i}`]);
+                }
+              }
+
+              chartCompetencias = new Chart(
+                document.getElementById("chart-competencias"),
+                {
+                  type: "bar",
+                  data: {
+                    labels:
+                      compLabels.length > 0 ? compLabels : ["Sin captura"],
+                    datasets: [
+                      {
+                        label: "Promedio Grupal",
+                        data: compValues.length > 0 ? compValues : [0],
+                        backgroundColor: "#0dcaf0",
+                        borderRadius: 4,
+                      },
+                    ],
+                  },
+                  options: { maintainAspectRatio: false },
+                },
+              );
+
+              // Gráfica de Dona: Acreditación
+              let cn = 0,
+                so = 0,
+                ci = 0;
+              res.acreditacion.forEach((a) => {
+                if (a.tipo_acreditacion === "CN") cn = a.total;
+                if (a.tipo_acreditacion === "SO") so = a.total;
+                if (a.tipo_acreditacion === "CI") ci = a.total;
+              });
+
+              document.getElementById("micro-val-cn").textContent = cn;
+              document.getElementById("micro-val-so").textContent = so;
+              document.getElementById("micro-val-ci").textContent = ci;
+
+              chartAcreditacion = new Chart(
+                document.getElementById("chart-acreditacion"),
+                {
+                  type: "doughnut",
+                  data: {
+                    labels: ["Normal (CN)", "Segunda (SO)", "Verano (CI)"],
+                    datasets: [
+                      {
+                        data: [cn, so, ci],
+                        backgroundColor: ["#198754", "#ffc107", "#0dcaf0"],
+                        borderWidth: 0,
+                        cutout: "70%",
+                      },
+                    ],
+                  },
+                  options: {
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                  },
+                },
+              );
+            } catch (error) {
+              console.error(error);
+            }
+          });
       }
 
       // ==========================================
