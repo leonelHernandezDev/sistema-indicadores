@@ -1135,6 +1135,16 @@
             const semestre = inputSemestre.value;
             const creditos = inputCreditos.value;
 
+            // --- NUEVA VALIDACIÓN DE MATERIA ---
+            const regexLetrasMateria = /^[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]+$/;
+            if (!regexLetrasMateria.test(nombre)) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "El nombre de la asignatura solo debe contener letras."
+              );
+              return;
+            };
+
             try {
               let res;
               if (idMateriaAEditar) {
@@ -1172,7 +1182,7 @@
               );
             }
           });
-        }
+        };
 
         if (tableMaterias) {
           tableMaterias.addEventListener("click", async (e) => {
@@ -1301,6 +1311,17 @@
             const id_periodo = selectGrupoPeriodo.value;
             const nombre_grupo = inputNombreGrupo.value.trim().toUpperCase();
 
+            // --- NUEVA VALIDACIÓN DE GRUPO ---
+            // \d{3} = Exige 3 números. - = Exige el guion. [A-Z] = Exige una letra al final.
+            const regexGrupo = /^\d{3}-[A-Z]$/; 
+            if (!regexGrupo.test(nombre_grupo)) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "El nombre del grupo tiene un formato inválido. Debe ser como '381-M' o '121-V'."
+              );
+              return;
+            }
+
             if (!id_periodo) {
               await window.electronAPI.invoke(
                 "dialog-alert",
@@ -1392,7 +1413,7 @@
             }
           });
         }
-      }
+      };
 
       // ==========================================
       //    LÓGICA: ALUMNOS
@@ -1544,6 +1565,35 @@
               "id_periodo_ingreso_fk",
             ).value,
           };
+
+                    // --- NUEVAS VALIDACIONES DE ALUMNO ---
+          const regexControl = /^\d{1,9}$/; // Solo números, entre 1 y 9 dígitos
+          const regexLetras = /^[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]+$/; // Solo letras y espacios
+
+          if (!regexControl.test(alumnoData.numero_control)) {
+            if (messageDiv) {
+              messageDiv.textContent = "El número de control debe contener solo números (máximo 9).";
+              messageDiv.className = "alert alert-danger mt-3";
+              messageDiv.classList.remove("d-none");
+            } else {
+              alert("El número de control debe contener solo números (máximo 8).");
+            }
+            return;
+          }
+
+          if (!regexLetras.test(alumnoData.nombre) || 
+              !regexLetras.test(alumnoData.apellido_paterno) || 
+              (alumnoData.apellido_materno && !regexLetras.test(alumnoData.apellido_materno))) {
+            if (messageDiv) {
+              messageDiv.textContent = "El nombre y los apellidos solo deben contener letras.";
+              messageDiv.className = "alert alert-danger mt-3";
+              messageDiv.classList.remove("d-none");
+            } else {
+              alert("El nombre y los apellidos solo deben contener letras.");
+            }
+            return;
+          }
+          // -------------------------------------
 
           if (!alumnoData.id_periodo_ingreso_fk) {
             if (messageDiv) {
