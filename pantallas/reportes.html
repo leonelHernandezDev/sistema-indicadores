@@ -1,0 +1,165 @@
+<div class="workspace-container d-flex flex-column h-100">
+  <div
+    class="d-flex justify-content-between align-items-center mb-4 flex-shrink-0"
+  >
+    <div>
+      <h3 class="mb-0 fw-bold text-white">
+        <i class="bi bi-printer me-2"></i>Centro de Auditoría y Reportes
+      </h3>
+      <p class="text-muted small mb-0">
+        Generación de documentos oficiales en Excel y PDF
+      </p>
+    </div>
+  </div>
+
+  <div class="row g-4 flex-grow-1" style="overflow-y: auto; padding-right: 5px">
+    <div class="col-md-6">
+      <div
+        class="card bg-dark border-0 shadow-sm h-100 border-top border-4 border-primary"
+      >
+        <div class="card-body p-4 d-flex flex-column">
+          <h5 class="fw-bold text-white mb-3">
+            <i class="bi bi-person-lines-fill me-2 text-primary"></i>Kárdex
+            Oficial del Alumno
+          </h5>
+          <p class="text-muted small mb-4">
+            Genera un PDF formal con el historial académico completo de un
+            estudiante específico, incluyendo promedios y estatus por materia.
+          </p>
+
+          <div class="position-relative mb-auto">
+            <label class="form-label small text-muted">Buscar Alumno:</label>
+            <input
+              type="text"
+              id="rep-kardex-search"
+              class="form-control bg-black border-secondary text-white"
+              placeholder="🔍 Número de control o nombre..."
+            />
+            <div
+              id="rep-kardex-results"
+              class="list-group position-absolute w-100 shadow d-none"
+              style="z-index: 1000; max-height: 200px; overflow-y: auto"
+            ></div>
+          </div>
+
+          <div
+            id="rep-kardex-selected"
+            class="alert bg-primary bg-opacity-10 border border-primary text-white mt-3 d-none"
+          >
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <strong class="d-block" id="rep-kardex-nombre">--</strong>
+                <small class="font-monospace text-muted" id="rep-kardex-control"
+                  >--</small
+                >
+              </div>
+              <button
+                class="btn btn-sm btn-outline-danger border-0"
+                id="btn-rep-kardex-clear"
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+
+          <button
+            class="btn btn-primary w-100 mt-4 shadow-sm"
+            id="btn-export-kardex-pdf"
+            disabled
+          >
+            <i class="bi bi-file-earmark-pdf-fill me-2"></i>Descargar Kárdex
+            (PDF)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div
+        class="card bg-dark border-0 shadow-sm h-100 border-top border-4 border-success"
+      >
+        <div class="card-body p-4 d-flex flex-column">
+          <h5 class="fw-bold text-white mb-3">
+            <i class="bi bi-table me-2 text-success"></i>Sábana de
+            Calificaciones Grupal
+          </h5>
+          <p class="text-muted small mb-4">
+            Exporta la lista de calificaciones finales y parciales de un grupo
+            específico en un periodo escolar.
+          </p>
+
+          <div class="mb-2">
+            <label class="form-label small text-muted mb-1">Periodo:</label>
+            <select
+              id="rep-sabana-periodo"
+              class="form-select bg-black border-secondary text-white"
+            >
+              <option value="">Cargando...</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small text-muted mb-1">Materia:</label>
+            <select
+              id="rep-sabana-materia"
+              class="form-select bg-black border-secondary text-white"
+            >
+              <option value="">Cargando...</option>
+            </select>
+          </div>
+          <div class="mb-auto">
+            <label class="form-label small text-muted mb-1">Grupo:</label>
+            <select
+              id="rep-sabana-grupo"
+              class="form-select bg-black border-secondary text-white"
+            >
+              <option value="">Todos los grupos</option>
+            </select>
+          </div>
+
+          <div class="d-flex gap-2 mt-4">
+            <button
+              class="btn btn-outline-success w-50 shadow-sm"
+              id="btn-export-sabana-excel"
+            >
+              <i class="bi bi-file-earmark-excel-fill me-2"></i>Excel
+            </button>
+            <button
+              class="btn btn-outline-danger w-50 shadow-sm"
+              id="btn-export-sabana-pdf"
+            >
+              <i class="bi bi-file-earmark-pdf-fill me-2"></i>PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-12">
+      <div
+        class="card bg-dark border-0 shadow-sm border-top border-4 border-warning"
+      >
+        <div
+          class="card-body p-4 d-flex justify-content-between align-items-center"
+        >
+          <div>
+            <h5 class="fw-bold text-white mb-2">
+              <i class="bi bi-mortarboard-fill me-2 text-warning"></i>Padrón
+              Histórico de Titulados
+            </h5>
+            <p class="text-muted small mb-0">
+              Base de datos completa de alumnos que han culminado su proceso de
+              titulación, con folios de acta y modalidad.
+            </p>
+          </div>
+          <button
+            class="btn btn-warning shadow-sm fw-bold px-4 py-2"
+            id="btn-export-titulados-excel"
+          >
+            <i class="bi bi-file-earmark-spreadsheet-fill me-2 text-dark"></i
+            >Generar Excel Maestro
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

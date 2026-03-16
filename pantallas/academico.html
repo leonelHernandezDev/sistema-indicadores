@@ -194,17 +194,33 @@
                       <option value="">Seleccione Periodo primero...</option>
                     </select>
                   </div>
-                  <div class="mb-3">
-                    <label class="form-label text-muted small mb-0"
-                      >Calificación Final</label
-                    >
-                    <input
-                      type="number"
-                      id="acad-calificacion"
-                      class="form-control text-center text-white fw-bold"
-                      min="0"
-                      max="100"
-                    />
+                  <div class="row g-2 mb-3">
+                    <div class="col-6">
+                      <label class="form-label text-muted small mb-0"
+                        >Calif. Final</label
+                      >
+                      <input
+                        type="number"
+                        id="acad-calificacion"
+                        class="form-control text-center text-white fw-bold"
+                        min="0"
+                        max="100"
+                      />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label text-muted small mb-0"
+                        >Acreditación</label
+                      >
+                      <select
+                        id="acad-acreditacion"
+                        class="form-select form-select-sm text-center text-white bg-dark border-secondary"
+                      >
+                        <option value="CN">CN</option>
+                        <option value="SO">SO</option>
+                        <option value="CI">CI</option>
+                        <option value="NA">NA</option>
+                      </select>
+                    </div>
                   </div>
                   <button type="submit" class="btn btn-primary w-100 shadow">
                     <i class="bi bi-check-lg"></i> Registrar
@@ -346,12 +362,26 @@
                   >Grupo: -- | Periodo: --</small
                 >
               </div>
-              <button
-                class="btn btn-sm btn-outline-success"
-                id="btn-add-alumno-sabana"
-              >
-                <i class="bi bi-person-plus"></i> Añadir Alumno
-              </button>
+              <div class="d-flex gap-2">
+                <input
+                  type="file"
+                  id="input-excel-calificaciones"
+                  accept=".xlsx, .xls"
+                  class="d-none"
+                />
+                <button
+                  class="btn btn-sm btn-success shadow-sm"
+                  id="btn-importar-calificaciones"
+                >
+                  <i class="bi bi-file-earmark-excel-fill"></i> Importar Excel
+                </button>
+                <button
+                  class="btn btn-sm btn-outline-success"
+                  id="btn-add-alumno-sabana"
+                >
+                  <i class="bi bi-person-plus"></i> Añadir Alumno
+                </button>
+              </div>
             </div>
             <div
               class="row g-2 align-items-center bg-black p-2 rounded border border-secondary border-opacity-25"
@@ -385,6 +415,8 @@
                   <option value="6">6</option>
                   <option value="7">7</option>
                   <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10">10</option>
                 </select>
               </div>
             </div>

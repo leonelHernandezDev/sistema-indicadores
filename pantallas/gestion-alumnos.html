@@ -6,9 +6,22 @@
       </h3>
       <p class="text-muted small mb-0">Directorio general de estudiantes</p>
     </div>
-    <button class="btn btn-primary shadow-sm" id="btn-nuevo-alumno">
-      <i class="bi bi-person-plus-fill me-2"></i> Nuevo Alumno
-    </button>
+    <div class="d-flex gap-2">
+      <input
+        type="file"
+        id="input-excel-alumnos"
+        accept=".xlsx, .xls"
+        class="d-none"
+      />
+
+      <button class="btn btn-success shadow-sm" id="btn-importar-excel">
+        <i class="bi bi-file-earmark-excel-fill me-2"></i> Importar Excel
+        Oficial
+      </button>
+      <button class="btn btn-primary shadow-sm" id="btn-nuevo-alumno">
+        <i class="bi bi-person-plus-fill me-2"></i> Nuevo Alumno
+      </button>
+    </div>
   </div>
 
   <div class="card shadow-sm border-0 mb-3">
@@ -42,6 +55,143 @@
         </thead>
         <tbody id="alumnos-table-body"></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<div
+  class="modal fade"
+  id="modalImportarAlumnos"
+  tabindex="-1"
+  aria-hidden="true"
+  data-bs-theme="dark"
+>
+  <div
+    class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"
+  >
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary bg-black">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-magic text-success me-2"></i> Asistente de Importación
+          de Alumnos
+        </h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+
+      <div class="modal-body p-0">
+        <div
+          class="bg-secondary bg-opacity-10 p-3 border-bottom border-secondary"
+        >
+          <div class="row g-3 align-items-center">
+            <div class="col-md-3">
+              <span class="text-muted small fw-bold text-uppercase d-block mb-1"
+                ><i class="bi bi-sliders"></i> Controles Maestros</span
+              >
+              <p class="small text-muted mb-0" style="line-height: 1.1">
+                Aplica estos valores a toda la lista de nuevos ingresos con un
+                clic.
+              </p>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small text-muted mb-1"
+                >Periodo de Ingreso Default:</label
+              >
+              <select
+                id="import-master-periodo"
+                class="form-select form-select-sm bg-black text-white border-secondary"
+              >
+                <option value="">Cargando...</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small text-muted mb-1"
+                >Estatus Default:</label
+              >
+              <select
+                id="import-master-status"
+                class="form-select form-select-sm bg-black text-white border-secondary"
+              >
+                <option value="Activo">Activo</option>
+                <option value="Baja Temporal">Baja Temporal</option>
+              </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <button
+                class="btn btn-sm btn-outline-info w-100 shadow-sm"
+                id="btn-aplicar-maestros"
+              >
+                <i class="bi bi-check2-all me-1"></i> Aplicar a todos los nuevos
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3">
+          <div
+            class="alert bg-primary bg-opacity-10 border border-primary text-white small mb-3"
+          >
+            <i class="bi bi-info-circle-fill me-2"></i>
+            El sistema ha separado los nombres automáticamente. Revisa que estén
+            correctos. Las filas en
+            <span class="text-muted text-decoration-line-through">gris</span>
+            indican alumnos que ya existen en la base de datos y serán
+            ignorados.
+          </div>
+
+          <div
+            class="table-responsive border border-secondary rounded"
+            style="max-height: 400px; overflow-y: auto"
+          >
+            <table
+              class="table table-sm table-dark table-hover align-middle mb-0"
+              style="font-size: 0.85rem"
+            >
+              <thead style="position: sticky; top: 0; z-index: 5">
+                <tr>
+                  <th class="bg-black">N° Control</th>
+                  <th class="bg-black">Nombre(s)</th>
+                  <th class="bg-black">Ap. Paterno</th>
+                  <th class="bg-black">Ap. Materno</th>
+                  <th class="bg-black">Género</th>
+                  <th class="bg-black">Periodo</th>
+                  <th class="bg-black">Estatus</th>
+                </tr>
+              </thead>
+              <tbody id="import-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="modal-footer border-secondary d-flex justify-content-between align-items-center"
+      >
+        <span class="small text-muted" id="import-stats"
+          >Analizando archivo...</span
+        >
+        <div>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn btn-success shadow px-4"
+            id="btn-guardar-importacion"
+            disabled
+          >
+            <i class="bi bi-cloud-upload-fill me-2"></i> Guardar Alumnos Nuevos
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

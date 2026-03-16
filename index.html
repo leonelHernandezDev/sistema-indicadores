@@ -330,12 +330,16 @@
     <script src="./node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="./node_modules/chart.js/dist/chart.umd.js"></script>
 
+    <script src="./node_modules/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="./node_modules/jspdf/dist/jspdf.umd.min.js"></script>
+    <script src="./node_modules/jspdf-autotable/dist/jspdf.plugin.autotable.min.js"></script>
+
     <script>
       const mainContent = document.getElementById("main-content");
       const navLinks = document.querySelectorAll("#main-nav a.nav-link");
 
       async function loadContent(pageName, data = null) {
-        if (!pageName || pageName === "reportes") {
+        if (!pageName) {
           mainContent.innerHTML =
             '<div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">' +
             '<h1><i class="bi bi-cone-striped display-1"></i></h1>' +
@@ -364,6 +368,9 @@
             await setupAcademico();
           } else if (pageName === "titulacion") {
             await setupTitulacion();
+          } else if (pageName === "reportes") {
+            // AQUÍ INICIAREMOS LA MAGIA DE EXPORTACIÓN
+            await setupReportes();
           }
         } catch (error) {
           console.error("Error al cargar la página:", error);
@@ -812,7 +819,7 @@
               // Gráfica: Competencias
               const compValues = [];
               const compLabels = [];
-              for (let i = 1; i <= 8; i++) {
+              for (let i = 1; i <= 10; i++) {
                 if (res.competencias[`c${i}`] !== null) {
                   compLabels.push(`C${i}`);
                   compValues.push(res.competencias[`c${i}`]);
@@ -1140,10 +1147,10 @@
             if (!regexLetrasMateria.test(nombre)) {
               await window.electronAPI.invoke(
                 "dialog-alert",
-                "El nombre de la asignatura solo debe contener letras."
+                "El nombre de la asignatura solo debe contener letras.",
               );
               return;
-            };
+            }
 
             try {
               let res;
@@ -1182,7 +1189,7 @@
               );
             }
           });
-        };
+        }
 
         if (tableMaterias) {
           tableMaterias.addEventListener("click", async (e) => {
@@ -1313,11 +1320,11 @@
 
             // --- NUEVA VALIDACIÓN DE GRUPO ---
             // \d{3} = Exige 3 números. - = Exige el guion. [A-Z] = Exige una letra al final.
-            const regexGrupo = /^\d{3}-[A-Z]$/; 
+            const regexGrupo = /^\d{3}-[A-Z]$/;
             if (!regexGrupo.test(nombre_grupo)) {
               await window.electronAPI.invoke(
                 "dialog-alert",
-                "El nombre del grupo tiene un formato inválido. Debe ser como '381-M' o '121-V'."
+                "El nombre del grupo tiene un formato inválido. Debe ser como '381-M' o '121-V'.",
               );
               return;
             }
@@ -1413,7 +1420,7 @@
             }
           });
         }
-      };
+      }
 
       // ==========================================
       //    LÓGICA: ALUMNOS
@@ -1472,6 +1479,7 @@
         const btnNuevo = document.getElementById("btn-nuevo-alumno");
         if (btnNuevo)
           btnNuevo.addEventListener("click", () => loadContent("form-alumno"));
+
         const searchInput = document.getElementById("search-alumnos");
         if (searchInput) {
           searchInput.addEventListener("input", (e) => {
@@ -1483,6 +1491,7 @@
             });
           });
         }
+
         const tableBody = document.getElementById("alumnos-table-body");
         if (tableBody) {
           tableBody.addEventListener("click", async (e) => {
@@ -1491,6 +1500,347 @@
             if (btnEliminar) await eliminarAlumno(btnEliminar.dataset.id);
             if (btnEditar) loadContent("form-alumno", btnEditar.dataset.id);
           });
+        }
+
+        // ==========================================
+        // LÓGICA DEL IMPORTADOR DE EXCEL
+        // ==========================================
+        const btnImportar = document.getElementById("btn-importar-excel");
+        const inputExcel = document.getElementById("input-excel-alumnos");
+
+        if (btnImportar && inputExcel) {
+          btnImportar.addEventListener("click", () => inputExcel.click());
+
+          inputExcel.addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 1. Mostrar la ventana Modal (Sala de espera)
+            const modalImportar = new bootstrap.Modal(
+              document.getElementById("modalImportarAlumnos"),
+            );
+            const tbodyImport = document.getElementById("import-table-body");
+            const btnGuardarImport = document.getElementById(
+              "btn-guardar-importacion",
+            );
+            const masterPeriodo = document.getElementById(
+              "import-master-periodo",
+            );
+
+            tbodyImport.innerHTML =
+              '<tr><td colspan="7" class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span> Leyendo archivo Excel...</td></tr>';
+            btnGuardarImport.disabled = true;
+            modalImportar.show();
+
+            try {
+              // 2. Traer catálogos (Alumnos existentes y Periodos)
+              const alumnosDB = await window.electronAPI.invoke("get-alumnos");
+              const controlesDB = alumnosDB.map((a) =>
+                String(a.numero_control).trim().toUpperCase(),
+              );
+
+              const periodos = await window.electronAPI.invoke("get-periodos");
+              masterPeriodo.innerHTML =
+                '<option value="">Seleccione Periodo...</option>';
+              periodos.forEach((p) => {
+                masterPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`;
+              });
+
+              // 3. Leer el archivo Excel con SheetJS
+              const reader = new FileReader();
+              reader.onload = async (evt) => {
+                const data = evt.target.result;
+                const workbook = XLSX.read(data, { type: "binary" });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+
+                // Convertir a JSON (arreglo de arreglos para buscar columnas sin importar el nombre exacto)
+                const filasRaw = XLSX.utils.sheet_to_json(worksheet, {
+                  header: 1,
+                });
+
+                if (filasRaw.length < 2) {
+                  tbodyImport.innerHTML =
+                    '<tr><td colspan="7" class="text-center text-danger">El archivo parece estar vacío.</td></tr>';
+                  return;
+                }
+
+                // 4. Inteligencia: Buscar columnas separadas (Soporta 1, 2 o 3 columnas de nombres)
+                let idxControl = -1,
+                  idxNombre = -1,
+                  idxApellidos = -1,
+                  idxPaterno = -1,
+                  idxMaterno = -1;
+                let filaHeaders = 0;
+
+                for (let i = 0; i < Math.min(10, filasRaw.length); i++) {
+                  const fila = filasRaw[i];
+                  if (!fila) continue;
+
+                  for (let j = 0; j < fila.length; j++) {
+                    const celda = String(fila[j] || "")
+                      .toLowerCase()
+                      .trim();
+                    if (!celda) continue;
+
+                    if (
+                      celda.includes("control") ||
+                      celda.includes("matricula")
+                    )
+                      idxControl = j;
+                    else if (
+                      celda.includes("paterno") ||
+                      celda.includes("1er apellido") ||
+                      celda.includes("primer apellido")
+                    )
+                      idxPaterno = j;
+                    else if (
+                      celda.includes("materno") ||
+                      celda.includes("2do apellido") ||
+                      celda.includes("segundo apellido")
+                    )
+                      idxMaterno = j;
+                    else if (
+                      celda === "apellidos" ||
+                      celda === "apellido" ||
+                      celda.includes("apellidos")
+                    )
+                      idxApellidos = j;
+                    else if (
+                      celda.includes("nombre") ||
+                      celda.includes("alumno") ||
+                      celda.includes("estudiante")
+                    )
+                      idxNombre = j;
+                  }
+
+                  if (idxControl !== -1 && idxNombre !== -1) {
+                    filaHeaders = i;
+                    break;
+                  }
+                }
+
+                if (idxControl === -1 || idxNombre === -1) {
+                  tbodyImport.innerHTML =
+                    '<tr><td colspan="7" class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i> No se encontró "Número de Control" o "Nombre" en el Excel.</td></tr>';
+                  return;
+                }
+
+                // 5. Procesar Alumnos
+                tbodyImport.innerHTML = "";
+                let nuevosEncontrados = 0;
+
+                for (let i = filaHeaders + 1; i < filasRaw.length; i++) {
+                  const fila = filasRaw[i];
+                  if (!fila || !fila[idxControl]) continue;
+
+                  const controlRaw = String(fila[idxControl])
+                    .trim()
+                    .toUpperCase();
+                  if (!controlRaw) continue; // Si la celda de control está vacía, saltar
+
+                  const yaExiste = controlesDB.includes(controlRaw);
+                  if (!yaExiste) nuevosEncontrados++;
+
+                  let n = "",
+                    p = "",
+                    m = "";
+                  const valNombre =
+                    idxNombre !== -1 && fila[idxNombre]
+                      ? String(fila[idxNombre]).trim()
+                      : "";
+
+                  // ¿Están separados por columnas o viene todo amontonado?
+                  if (idxPaterno !== -1 || idxMaterno !== -1) {
+                    // MODO 3 COLUMNAS (Nombre | Paterno | Materno)
+                    n = valNombre;
+                    p =
+                      idxPaterno !== -1 && fila[idxPaterno]
+                        ? String(fila[idxPaterno]).trim()
+                        : "";
+                    m =
+                      idxMaterno !== -1 && fila[idxMaterno]
+                        ? String(fila[idxMaterno]).trim()
+                        : "";
+                  } else if (idxApellidos !== -1) {
+                    // MODO 2 COLUMNAS (Nombre | Apellidos) <-- ¡AQUÍ ENTRARÁ TU ARCHIVO ACTUAL!
+                    n = valNombre;
+                    const valApellidos = fila[idxApellidos]
+                      ? String(fila[idxApellidos]).trim()
+                      : "";
+                    const partesAp = valApellidos.split(/\s+/);
+                    if (partesAp.length === 1) {
+                      p = partesAp[0];
+                    } else if (partesAp.length >= 2) {
+                      m = partesAp.pop(); // La última palabra es el materno
+                      p = partesAp.join(" "); // El resto es el paterno (Cubre casos como "De La Cruz")
+                    }
+                  } else {
+                    // MODO 1 COLUMNA (Todo amontonado en "Nombre" o "Alumno")
+                    const partes = valNombre.split(/\s+/);
+                    if (partes.length === 1) {
+                      n = partes[0];
+                    } else if (partes.length === 2) {
+                      p = partes[0];
+                      n = partes[1];
+                    } else if (partes.length >= 3) {
+                      p = partes.shift(); // La 1ra palabra es el Paterno
+                      m = partes.shift(); // La 2da palabra es el Materno
+                      n = partes.join(" "); // Todo lo que sobra es el Nombre(s)
+                    }
+                  }
+
+                  // Generar la fila (Si ya existe, se bloquea y se pinta gris)
+                  const tr = document.createElement("tr");
+                  if (yaExiste) {
+                    tr.className =
+                      "opacity-50 text-decoration-line-through bg-black";
+                    tr.innerHTML = `
+                       <td>${controlRaw}</td>
+                       <td colspan="6" class="text-muted"><i class="bi bi-info-circle"></i> Ya registrado en el sistema.</td>
+                     `;
+                  } else {
+                    tr.className = "alumno-import-row";
+                    tr.innerHTML = `
+                       <td class="font-monospace text-primary fw-bold" data-val="${controlRaw}">${controlRaw}</td>
+                       <td><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary val-nombre" value="${n}"></td>
+                       <td><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary val-paterno" value="${p}"></td>
+                       <td><input type="text" class="form-control form-control-sm bg-dark text-white border-secondary val-materno" value="${m}"></td>
+                       <td>
+                         <select class="form-select form-select-sm bg-dark text-white border-secondary val-genero">
+                           <option value="Masculino">M</option>
+                           <option value="Femenino">F</option>
+                         </select>
+                       </td>
+                       <td>
+                         <select class="form-select form-select-sm bg-dark text-white border-secondary val-periodo">
+                           <option value="">...</option>
+                           ${periodos.map((per) => `<option value="${per.id_periodo}">${per.nombre}</option>`).join("")}
+                         </select>
+                       </td>
+                       <td>
+                         <select class="form-select form-select-sm bg-dark text-white border-secondary val-status">
+                           <option value="Activo">Activo</option>
+                           <option value="Baja Temporal">Baja T.</option>
+                         </select>
+                       </td>
+                     `;
+                  }
+                  tbodyImport.appendChild(tr);
+                }
+
+                document.getElementById("import-stats").innerHTML =
+                  `Se encontraron <strong class="text-white">${nuevosEncontrados}</strong> alumnos nuevos listos para importar.`;
+                if (nuevosEncontrados > 0) btnGuardarImport.disabled = false;
+              };
+              reader.readAsBinaryString(file);
+            } catch (e) {
+              console.error(e);
+              tbodyImport.innerHTML =
+                '<tr><td colspan="7" class="text-center text-danger">Error al procesar el archivo.</td></tr>';
+            }
+
+            // Limpiar input para poder volver a subir el mismo archivo si hay error
+            inputExcel.value = "";
+          });
+
+          // 6. Controles Maestros (Aplicar a todos)
+          document
+            .getElementById("btn-aplicar-maestros")
+            .addEventListener("click", () => {
+              const valPeriodo = document.getElementById(
+                "import-master-periodo",
+              ).value;
+              const valStatus = document.getElementById(
+                "import-master-status",
+              ).value;
+
+              if (!valPeriodo) {
+                window.electronAPI.invoke(
+                  "dialog-alert",
+                  "Selecciona un periodo maestro primero.",
+                );
+                return;
+              }
+
+              const filasNuevas =
+                document.querySelectorAll(".alumno-import-row");
+              filasNuevas.forEach((fila) => {
+                fila.querySelector(".val-periodo").value = valPeriodo;
+                fila.querySelector(".val-status").value = valStatus;
+              });
+            });
+
+          // 7. Guardar en Base de Datos
+          document
+            .getElementById("btn-guardar-importacion")
+            .addEventListener("click", async (e) => {
+              const filasNuevas =
+                document.querySelectorAll(".alumno-import-row");
+              const payload = [];
+              let hayErrores = false;
+
+              filasNuevas.forEach((fila) => {
+                const idPeriodo = fila.querySelector(".val-periodo").value;
+                if (!idPeriodo) hayErrores = true;
+
+                payload.push({
+                  numero_control: fila.querySelector("td").dataset.val,
+                  nombre: fila
+                    .querySelector(".val-nombre")
+                    .value.trim()
+                    .toUpperCase(),
+                  apellido_paterno: fila
+                    .querySelector(".val-paterno")
+                    .value.trim()
+                    .toUpperCase(),
+                  apellido_materno: fila
+                    .querySelector(".val-materno")
+                    .value.trim()
+                    .toUpperCase(),
+                  genero: fila.querySelector(".val-genero").value,
+                  status: fila.querySelector(".val-status").value,
+                  id_periodo_ingreso_fk: idPeriodo || null,
+                });
+              });
+
+              if (hayErrores) {
+                window.electronAPI.invoke(
+                  "dialog-alert",
+                  "ERROR: Todos los alumnos nuevos deben tener asignado un Periodo de Ingreso.",
+                );
+                return;
+              }
+
+              try {
+                const btn = e.target;
+                const originalText = btn.innerHTML;
+                btn.innerHTML =
+                  '<span class="spinner-border spinner-border-sm me-2"></span> Guardando...';
+                btn.disabled = true;
+
+                // Enviar al Backend Masivo
+                await window.electronAPI.invoke("add-alumnos-masivo", payload);
+
+                // Recargar tabla principal y cerrar modal
+                await cargarAlumnos();
+                bootstrap.Modal.getInstance(
+                  document.getElementById("modalImportarAlumnos"),
+                ).hide();
+
+                window.electronAPI.invoke(
+                  "dialog-alert",
+                  "¡Importación exitosa!",
+                );
+              } catch (error) {
+                console.error(error);
+                window.electronAPI.invoke(
+                  "dialog-alert",
+                  "Error al importar: " + error.message,
+                );
+                e.target.disabled = false;
+              }
+            });
         }
       }
 
@@ -1566,26 +1916,33 @@
             ).value,
           };
 
-                    // --- NUEVAS VALIDACIONES DE ALUMNO ---
+          // --- NUEVAS VALIDACIONES DE ALUMNO ---
           const regexControl = /^\d{1,9}$/; // Solo números, entre 1 y 9 dígitos
           const regexLetras = /^[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]+$/; // Solo letras y espacios
 
           if (!regexControl.test(alumnoData.numero_control)) {
             if (messageDiv) {
-              messageDiv.textContent = "El número de control debe contener solo números (máximo 9).";
+              messageDiv.textContent =
+                "El número de control debe contener solo números (máximo 9).";
               messageDiv.className = "alert alert-danger mt-3";
               messageDiv.classList.remove("d-none");
             } else {
-              alert("El número de control debe contener solo números (máximo 8).");
+              alert(
+                "El número de control debe contener solo números (máximo 8).",
+              );
             }
             return;
           }
 
-          if (!regexLetras.test(alumnoData.nombre) || 
-              !regexLetras.test(alumnoData.apellido_paterno) || 
-              (alumnoData.apellido_materno && !regexLetras.test(alumnoData.apellido_materno))) {
+          if (
+            !regexLetras.test(alumnoData.nombre) ||
+            !regexLetras.test(alumnoData.apellido_paterno) ||
+            (alumnoData.apellido_materno &&
+              !regexLetras.test(alumnoData.apellido_materno))
+          ) {
             if (messageDiv) {
-              messageDiv.textContent = "El nombre y los apellidos solo deben contener letras.";
+              messageDiv.textContent =
+                "El nombre y los apellidos solo deben contener letras.";
               messageDiv.className = "alert alert-danger mt-3";
               messageDiv.classList.remove("d-none");
             } else {
@@ -1767,6 +2124,8 @@
 
           formAcademico.reset();
           idInscripcionAEditar = null;
+          // ---> INYECCIÓN <---
+          document.getElementById("acad-acreditacion").value = "CN";
           if (btnGuardarKardex) {
             btnGuardarKardex.innerHTML =
               '<i class="bi bi-check-lg"></i> Registrar';
@@ -1889,6 +2248,16 @@
                 <td class="text-center fw-bold fs-5 ${colorCalificacion}">${califMostrar}</td>
                 <td class="text-center"><span class="badge ${badgeClass}">${reg.estado_materia}</span></td>
                 <td class="text-end pe-4">
+                  <button class="btn btn-sm btn-outline-warning btn-editar-inscripcion border-0 me-1" 
+                    data-id="${reg.id_inscripcion}"
+                    data-periodo="${reg.id_periodo_fk}"
+                    data-materia="${reg.id_materia_fk}"
+                    data-grupo="${reg.id_grupo_fk}"
+                    data-calif="${reg.calificacion_final !== null ? reg.calificacion_final : ""}"
+                    data-acreditacion="${reg.tipo_acreditacion || "CN"}"
+                    title="Editar registro">
+                    <i class="bi bi-pencil"></i>
+                  </button>
                   <button class="btn btn-sm btn-outline-danger btn-borrar-inscripcion border-0" data-id="${reg.id_inscripcion}" title="Eliminar registro">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -1903,7 +2272,7 @@
                 rowDetalle.id = idCollapse;
 
                 let desglose = `<div class="d-flex gap-3 justify-content-center py-2 text-muted small font-monospace">`;
-                for (let i = 1; i <= 8; i++) {
+                for (let i = 1; i <= 10; i++) {
                   const c = reg[`c${i}`];
                   if (c !== null) {
                     const color = c < 70 ? "text-danger fw-bold" : "text-info";
@@ -1952,6 +2321,9 @@
               }
 
               acadCalificacion.value = btnEditar.dataset.calif;
+              // ---> INYECCIÓN <---
+              document.getElementById("acad-acreditacion").value =
+                btnEditar.dataset.acreditacion || "CN";
 
               // Cambiar aspecto del botón principal
               if (btnGuardarKardex) {
@@ -2030,6 +2402,9 @@
                   id_grupo_fk: acadGrupo.value,
                   calificacion_final: califNum, // Campo de la nueva base de datos
                   estado_materia: estado,
+                  // ---> INYECCIÓN <---
+                  tipo_acreditacion:
+                    document.getElementById("acad-acreditacion").value,
                 });
                 await window.electronAPI.invoke(
                   "dialog-alert",
@@ -2055,6 +2430,8 @@
                   id_grupo_fk: acadGrupo.value,
                   calificacion_final: califNum, // Campo de la nueva base de datos
                   estado_materia: estado,
+                  tipo_acreditacion:
+                    document.getElementById("acad-acreditacion").value,
                 };
                 // Usamos el canal seguro e individual, ¡No el masivo de la sábana!
                 await window.electronAPI.invoke(
@@ -2349,6 +2726,8 @@
               c6: null,
               c7: null,
               c8: null,
+              c9: null,
+              c10: null,
               calificacion_final: null,
               estado_materia: "Cursando",
               tipo_acreditacion: "CN",
@@ -2466,6 +2845,7 @@
                   <option value="CN" ${a.tipo_acreditacion === "CN" || !a.tipo_acreditacion ? "selected" : ""}>CN (Normal)</option>
                   <option value="SO" ${a.tipo_acreditacion === "SO" ? "selected" : ""}>SO (Segunda)</option>
                   <option value="CI" ${a.tipo_acreditacion === "CI" ? "selected" : ""}>CI (Verano)</option>
+                  <option value="NA" ${a.tipo_acreditacion === "NA" ? "selected" : ""}>NA</option>
                 </select>
               </td>
               <td class="text-center">
@@ -2486,25 +2866,53 @@
           });
 
           // --- C. LÓGICA DE CALCULADORA EN VIVO Y VALIDACIONES ---
-          const inputs = tbodySabana.querySelectorAll("input[type='number']");
+          const inputs = tbodySabana.querySelectorAll("input"); // Tomamos todos (parciales y finales)
 
           inputs.forEach((input) => {
-            // Detalle Senior: Bloquear teclas no numéricas (e, +, -) y limitar el máximo a 100
+            // 1. Bloquear caracteres inválidos mientras teclea
             input.addEventListener("keydown", (e) => {
               if (["e", "E", "+", "-", "."].includes(e.key)) e.preventDefault();
             });
 
+            // 2. Mientras escribe: Solo limitamos el tope máximo a 100 para no arruinar la UX
             input.addEventListener("input", (e) => {
-              let val = parseInt(e.target.value);
-              if (val > 100) e.target.value = 100;
-              if (val < 0) e.target.value = 0;
+              if (e.target.value !== "") {
+                let val = parseInt(e.target.value);
+                if (val > 100) e.target.value = 100;
+                if (val < 0) e.target.value = 0;
+              }
 
-              // Alerta visual de cambios sin guardar
               sabanaStatusGuardado.innerHTML =
                 '<span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Cambios sin guardar</span>';
               window.cambiosSinGuardarSabana = true;
-              // Disparar cálculo automático
-              calcularPromedioFila(e.target.closest("tr"));
+
+              // Solo calculamos promedio si es un input parcial
+              if (e.target.classList.contains("input-parcial")) {
+                calcularPromedioFila(e.target.closest("tr"));
+              }
+            });
+
+            // 3. LA NUEVA MAGIA (blur): Al salir de la celda, aplicamos la regla estricta TecNM
+            input.addEventListener("blur", (e) => {
+              if (e.target.value !== "") {
+                let val = parseInt(e.target.value);
+                // Si la calificación es menor a 70, la aplastamos a 0
+                if (val < 70) {
+                  e.target.value = 0;
+                }
+
+                // Efecto visual: Pintar de rojo si es 0, blanco/info si aprobó
+                if (e.target.classList.contains("input-final")) {
+                  e.target.classList.remove("text-danger", "text-white");
+                  e.target.classList.add(
+                    e.target.value == 0 ? "text-danger" : "text-white",
+                  );
+                }
+
+                if (e.target.classList.contains("input-parcial")) {
+                  calcularPromedioFila(e.target.closest("tr"));
+                }
+              }
             });
           });
 
@@ -2696,112 +3104,256 @@
             });
           });
 
-        // 8. GUARDAR SÁBANA (Preparación del JSON para el UPSERT en main.js)
-        btnGuardarSabana.addEventListener("click", async () => {
-          if (alumnosEnSabana.length === 0) return;
+        // =========================================================
+        // 7.5 IMPORTADOR INTELIGENTE DE CALIFICACIONES (Excel)
+        // =========================================================
+        const btnImportarCalif = document.getElementById(
+          "btn-importar-calificaciones",
+        );
+        const inputExcelCalif = document.getElementById(
+          "input-excel-calificaciones",
+        );
 
-          // CORRECCIÓN: Parseamos a Entero para que el motor UPSERT de main.js los compare bien
-          const payload = {
-            id_periodo: parseInt(sabanaPeriodo.value),
-            id_materia: parseInt(sabanaMateria.value),
-            id_grupo: parseInt(sabanaGrupo.value),
-            alumnos: [],
-          };
-
-          const filas = tbodySabana.querySelectorAll("tr");
-
-          filas.forEach((fila) => {
-            const isCompetencias = switchModalidad.checked;
-            const alumnoData = {
-              // Si existe el ID, lo convertimos a Número. Si no, va Nulo.
-              id_inscripcion: fila.dataset.id_inscripcion
-                ? parseInt(fila.dataset.id_inscripcion)
-                : null,
-              id_alumno_fk: parseInt(fila.dataset.id_alumno),
-              c1: null,
-              c2: null,
-              c3: null,
-              c4: null,
-              c5: null,
-              c6: null,
-              c7: null,
-              c8: null,
-              calificacion_final: null,
-              estado_materia: fila.querySelector(".select-estado").value,
-              tipo_acreditacion: fila.querySelector(".select-acreditacion")
-                .value,
-            };
-
-            if (isCompetencias) {
-              const parciales = fila.querySelectorAll(".input-parcial");
-              parciales.forEach((p) => {
-                const compKey = p.dataset.comp;
-                if (p.value !== "") alumnoData[compKey] = parseFloat(p.value);
-              });
-            }
-
-            const califFinalStr = fila.querySelector(".input-final").value;
-
-            if (califFinalStr === "NA") {
-              alumnoData.calificacion_final = 0;
-              if (alumnoData.estado_materia === "Auto")
-                alumnoData.estado_materia = "Reprobada";
-            } else if (califFinalStr !== "") {
-              alumnoData.calificacion_final = parseFloat(califFinalStr);
-              if (alumnoData.estado_materia === "Auto") {
-                alumnoData.estado_materia =
-                  alumnoData.calificacion_final >= 70
-                    ? "Aprobada"
-                    : "Reprobada";
-              }
-            }
-
-            payload.alumnos.push(alumnoData);
+        if (btnImportarCalif && inputExcelCalif) {
+          // 1. Ya no bloqueamos si la lista está vacía. ¡Ahora la construimos!
+          btnImportarCalif.addEventListener("click", () => {
+            inputExcelCalif.click();
           });
 
-          try {
-            const originalHtml = btnGuardarSabana.innerHTML;
-            btnGuardarSabana.innerHTML =
-              '<span class="spinner-border spinner-border-sm me-2"></span>Sincronizando...';
-            btnGuardarSabana.disabled = true;
+          inputExcelCalif.addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-            const res = await window.electronAPI.invoke(
-              "save-calificaciones-masivas",
-              payload,
-            );
+            try {
+              const reader = new FileReader();
+              reader.onload = async (evt) => {
+                const data = evt.target.result;
+                const workbook = XLSX.read(data, { type: "binary" });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const filasRaw = XLSX.utils.sheet_to_json(worksheet, {
+                  header: 1,
+                });
 
-            if (res.success) {
-              window.cambiosSinGuardarSabana = false;
-              btnGuardarSabana.classList.replace("btn-primary", "btn-success");
-              btnGuardarSabana.classList.replace("btn-warning", "btn-success");
-              btnGuardarSabana.innerHTML =
-                '<i class="bi bi-check2-all me-2"></i> ¡Lista Sincronizada!';
-              sabanaStatusGuardado.innerHTML =
-                '<span class="text-success"><i class="bi bi-cloud-check"></i> Base de datos actualizada</span>';
+                if (filasRaw.length < 2) return;
 
-              formSabana.dispatchEvent(new Event("submit"));
+                // 2. Identificar columnas dinámicamente
+                let idxControl = -1;
+                let idxFinal = -1;
+                let idxCompetencias = {};
+                let filaHeaders = -1;
 
-              setTimeout(() => {
-                btnGuardarSabana.innerHTML = originalHtml;
-                btnGuardarSabana.disabled = false;
-              }, 2000);
+                for (let i = 0; i < Math.min(15, filasRaw.length); i++) {
+                  const fila = filasRaw[i];
+                  if (!fila) continue;
+
+                  for (let j = 0; j < fila.length; j++) {
+                    const celdaStr = String(fila[j] || "")
+                      .toLowerCase()
+                      .trim();
+                    if (!celdaStr) continue;
+
+                    if (
+                      celdaStr.includes("control") ||
+                      celdaStr.includes("matricula")
+                    )
+                      idxControl = j;
+                    else if (
+                      celdaStr.includes("promedio") ||
+                      celdaStr.includes("calif")
+                    )
+                      idxFinal = j;
+
+                    const matchC = celdaStr.match(/^(?:c|u)?\s*(\d+)$/);
+                    if (matchC) {
+                      const numComp = parseInt(matchC[1]);
+                      if (numComp >= 1 && numComp <= 10)
+                        idxCompetencias[numComp] = j;
+                    }
+                  }
+                  if (idxControl !== -1) {
+                    filaHeaders = i;
+                    break;
+                  }
+                }
+
+                if (idxControl === -1) {
+                  await window.electronAPI.invoke(
+                    "dialog-alert",
+                    "No se encontró la columna de Número de Control en el Excel.",
+                  );
+                  inputExcelCalif.value = "";
+                  return;
+                }
+
+                // 3. FASE DE CONSTRUCCIÓN: Cruzar Excel con nuestra Base de Datos
+                const alumnosDB =
+                  await window.electronAPI.invoke("get-alumnos");
+                let alumnosAgregados = 0;
+                let alumnosNoEncontrados = [];
+
+                for (let i = filaHeaders + 1; i < filasRaw.length; i++) {
+                  const fila = filasRaw[i];
+                  if (!fila || !fila[idxControl]) continue;
+
+                  const controlExcel = String(fila[idxControl])
+                    .trim()
+                    .toUpperCase();
+                  if (!controlExcel) continue;
+
+                  // Buscar si ese alumno del Excel existe en nuestro sistema
+                  const alumnoDB = alumnosDB.find(
+                    (a) =>
+                      String(a.numero_control).trim().toUpperCase() ===
+                      controlExcel,
+                  );
+
+                  if (!alumnoDB) {
+                    alumnosNoEncontrados.push(controlExcel);
+                    continue; // Lo ignoramos
+                  }
+
+                  // Verificar si ya estaba en la Sábana visual, si no, lo agregamos a la memoria
+                  let yaEnSabana = alumnosEnSabana.find(
+                    (a) => a.numero_control === controlExcel,
+                  );
+                  if (!yaEnSabana) {
+                    alumnosEnSabana.push({
+                      id_alumno_fk: alumnoDB.id_alumno,
+                      numero_control: alumnoDB.numero_control,
+                      nombre: alumnoDB.nombre,
+                      apellido_paterno: alumnoDB.apellido_paterno,
+                      id_inscripcion: null, // Porque es nuevo en esta materia
+                      c1: null,
+                      c2: null,
+                      c3: null,
+                      c4: null,
+                      c5: null,
+                      c6: null,
+                      c7: null,
+                      c8: null,
+                      c9: null,
+                      c10: null,
+                      calificacion_final: null,
+                      estado_materia: "Cursando",
+                      tipo_acreditacion: "CN",
+                    });
+                    alumnosAgregados++;
+                  }
+                }
+
+                // 4. Renderizamos la Sábana para que aparezcan visualmente los nuevos alumnos
+                if (alumnosAgregados > 0) {
+                  renderizarSabanaDinamica();
+                }
+
+                // 5. FASE DE INYECCIÓN DE CALIFICACIONES
+                const isCompetencias = switchModalidad.checked;
+                const numCompEsperadas = parseInt(selectNumCompetencias.value);
+                let alumnosActualizados = 0;
+
+                for (let i = filaHeaders + 1; i < filasRaw.length; i++) {
+                  const fila = filasRaw[i];
+                  if (!fila || !fila[idxControl]) continue;
+
+                  const controlExcel = String(fila[idxControl])
+                    .trim()
+                    .toUpperCase();
+
+                  const filasDOM = Array.from(
+                    tbodySabana.querySelectorAll("tr"),
+                  );
+                  const filaAlumnoDOM = filasDOM.find((tr) => {
+                    const tdControl = tr.querySelector("td.fw-bold.text-muted");
+                    return (
+                      tdControl &&
+                      tdControl.textContent.trim().toUpperCase() ===
+                        controlExcel
+                    );
+                  });
+
+                  if (filaAlumnoDOM) {
+                    let inyectado = false;
+                    if (isCompetencias) {
+                      for (let c = 1; c <= numCompEsperadas; c++) {
+                        if (
+                          idxCompetencias[c] !== undefined &&
+                          fila[idxCompetencias[c]] !== undefined
+                        ) {
+                          let valStr = String(fila[idxCompetencias[c]]).trim();
+                          let val =
+                            valStr.toUpperCase() === "NA"
+                              ? 0
+                              : parseFloat(valStr);
+
+                          if (!isNaN(val)) {
+                            const inputDOM = filaAlumnoDOM.querySelector(
+                              `.input-parcial[data-comp="c${c}"]`,
+                            );
+                            if (inputDOM) {
+                              inputDOM.value = val;
+                              inputDOM.dispatchEvent(
+                                new Event("input", { bubbles: true }),
+                              );
+                              inputDOM.dispatchEvent(
+                                new Event("blur", { bubbles: true }),
+                              );
+                              inyectado = true;
+                            }
+                          }
+                        }
+                      }
+                    } else {
+                      if (idxFinal !== -1 && fila[idxFinal] !== undefined) {
+                        let valStr = String(fila[idxFinal]).trim();
+                        let val =
+                          valStr.toUpperCase() === "NA"
+                            ? 0
+                            : parseFloat(valStr);
+
+                        if (!isNaN(val)) {
+                          const inputDOM =
+                            filaAlumnoDOM.querySelector(`.input-final`);
+                          if (inputDOM) {
+                            inputDOM.value = val;
+                            inputDOM.dispatchEvent(
+                              new Event("input", { bubbles: true }),
+                            );
+                            inputDOM.dispatchEvent(
+                              new Event("blur", { bubbles: true }),
+                            );
+                            inyectado = true;
+                          }
+                        }
+                      }
+                    }
+                    if (inyectado) alumnosActualizados++;
+                  }
+                }
+
+                window.cambiosSinGuardarSabana = true;
+                sabanaStatusGuardado.innerHTML =
+                  '<span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle"></i> Excel Importado. Revisa y haz clic en Guardar.</span>';
+
+                let mensajeFinal = `¡Éxito! Se agregaron ${alumnosAgregados} alumnos a la lista y se inyectaron las calificaciones de ${alumnosActualizados} alumnos.\n\nRevisa la tabla en pantalla y presiona "Guardar Lista" cuando estés listo.`;
+
+                if (alumnosNoEncontrados.length > 0) {
+                  mensajeFinal += `\n\n⚠️ ATENCIÓN: Se ignoraron ${alumnosNoEncontrados.length} alumnos del Excel porque no están registrados en el sistema (Ej: ${alumnosNoEncontrados.slice(0, 3).join(", ")}...).`;
+                }
+
+                await window.electronAPI.invoke("dialog-alert", mensajeFinal);
+              };
+              reader.readAsBinaryString(file);
+            } catch (e) {
+              console.error(e);
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error al procesar el archivo Excel.",
+              );
             }
-          } catch (error) {
-            await window.electronAPI.invoke(
-              "dialog-alert",
-              "Error al guardar: " + error.message,
-            );
-            btnGuardarSabana.disabled = false;
-          }
-        });
-        // 9. Botón Cerrar Lista
-        document
-          .getElementById("btn-limpiar-sabana")
-          .addEventListener("click", () => {
-            sabanaWorkspace.classList.add("d-none");
-            sabanaEmptyState.classList.add("d-none");
-            alumnosEnSabana = [];
+            inputExcelCalif.value = "";
           });
+        }
 
         // ==========================================
         // PILAR 7: ÁNGEL DE LA GUARDA (Unsaved Changes)
@@ -2845,6 +3397,128 @@
           document.getElementById("sabana-empty-state").classList.add("d-none");
           alumnosEnSabana = [];
         });
+
+        // ==========================================
+        // 8. GUARDAR SÁBANA (Preparación del JSON y envío)
+        // ==========================================
+        if (btnGuardarSabana) {
+          btnGuardarSabana.addEventListener("click", async () => {
+            const filas = document.querySelectorAll("#sabana-table-body tr");
+            if (filas.length === 0) return;
+
+            const periodoId = sabanaPeriodo.value;
+            const materiaId = sabanaMateria.value;
+            const grupoId = sabanaGrupo.value;
+
+            const alumnosToSave = [];
+
+            filas.forEach((tr) => {
+              const idAlumno = parseInt(tr.dataset.id_alumno);
+              const idInscripcion = tr.dataset.id_inscripcion
+                ? parseInt(tr.dataset.id_inscripcion)
+                : null;
+
+              const selectAcreditacion = tr.querySelector(
+                ".select-acreditacion",
+              );
+              const valAcreditacion = selectAcreditacion
+                ? selectAcreditacion.value
+                : "CN";
+
+              const selectEstado = tr.querySelector(".select-estado");
+              const valEstadoManual = selectEstado
+                ? selectEstado.value
+                : "Auto";
+
+              const alumnoData = {
+                id_inscripcion: idInscripcion,
+                id_alumno_fk: idAlumno,
+                c1: null,
+                c2: null,
+                c3: null,
+                c4: null,
+                c5: null,
+                c6: null,
+                c7: null,
+                c8: null,
+                c9: null,
+                c10: null,
+                calificacion_final: null,
+                estado_materia: "Cursando",
+                tipo_acreditacion: valAcreditacion,
+              };
+
+              // Extraer calificaciones parciales
+              for (let i = 1; i <= 10; i++) {
+                const inp = tr.querySelector(
+                  `.input-parcial[data-comp="c${i}"]`,
+                );
+                if (inp && inp.value !== "") {
+                  alumnoData[`c${i}`] = parseFloat(inp.value);
+                }
+              }
+
+              // Extraer calificación final y aplicar estatus
+              const inFinal = tr.querySelector(".input-final");
+              if (inFinal && inFinal.value !== "" && inFinal.value !== "NA") {
+                alumnoData.calificacion_final = parseFloat(inFinal.value);
+                alumnoData.estado_materia =
+                  alumnoData.calificacion_final >= 70
+                    ? "Aprobada"
+                    : "Reprobada";
+              } else if (inFinal && inFinal.value === "NA") {
+                alumnoData.calificacion_final = 0;
+                alumnoData.estado_materia = "Reprobada";
+              }
+
+              if (valEstadoManual === "Baja") {
+                alumnoData.estado_materia = "Baja";
+              }
+
+              alumnosToSave.push(alumnoData);
+            });
+
+            try {
+              const textOrig = btnGuardarSabana.innerHTML;
+              btnGuardarSabana.innerHTML =
+                '<span class="spinner-border spinner-border-sm me-2"></span> Guardando...';
+              btnGuardarSabana.disabled = true;
+
+              const payload = {
+                id_periodo: periodoId,
+                id_materia: materiaId,
+                id_grupo: grupoId,
+                alumnos: alumnosToSave,
+              };
+
+              const res = await window.electronAPI.invoke(
+                "save-calificaciones-masivas",
+                payload,
+              );
+
+              if (res.success) {
+                window.cambiosSinGuardarSabana = false;
+                sabanaStatusGuardado.innerHTML =
+                  '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Lista Guardada Correctamente</span>';
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "¡Lista guardada con éxito!",
+                );
+                formSabana.dispatchEvent(new Event("submit")); // Recargar UI
+              }
+
+              btnGuardarSabana.innerHTML = textOrig;
+              btnGuardarSabana.disabled = false;
+            } catch (err) {
+              console.error(err);
+              window.electronAPI.invoke(
+                "dialog-alert",
+                "Error al guardar: " + err.message,
+              );
+              btnGuardarSabana.disabled = false;
+            }
+          });
+        }
       }
 
       // ==========================================
@@ -3078,6 +3752,390 @@
             }
           }
         });
+      }
+      // ==========================================
+      //    LÓGICA: REPORTES Y AUDITORÍA
+      // ==========================================
+      async function setupReportes() {
+        console.log("Módulo de Reportes Iniciado");
+
+        // Inicializamos el motor de PDF
+        const { jsPDF } = window.jspdf;
+
+        // ---------------------------------------------------------
+        // REPORTE 1: KÁRDEX OFICIAL (PDF)
+        // ---------------------------------------------------------
+        let todosLosAlumnos = [];
+        try {
+          todosLosAlumnos = await window.electronAPI.invoke("get-alumnos");
+        } catch (e) {}
+
+        const kardexSearch = document.getElementById("rep-kardex-search");
+        const kardexResults = document.getElementById("rep-kardex-results");
+        const kardexSelected = document.getElementById("rep-kardex-selected");
+        const btnClearKardex = document.getElementById("btn-rep-kardex-clear");
+        const btnExportKardex = document.getElementById(
+          "btn-export-kardex-pdf",
+        );
+
+        let alumnoKardexSeleccionado = null;
+
+        // Buscador Predictivo de Alumnos
+        kardexSearch.addEventListener("input", (e) => {
+          const val = e.target.value.toLowerCase().trim();
+          kardexResults.innerHTML = "";
+          if (!val) {
+            kardexResults.classList.add("d-none");
+            return;
+          }
+
+          const filtrados = todosLosAlumnos
+            .filter(
+              (a) =>
+                a.nombre.toLowerCase().includes(val) ||
+                a.apellido_paterno.toLowerCase().includes(val) ||
+                a.numero_control.includes(val),
+            )
+            .slice(0, 5);
+
+          if (filtrados.length > 0) {
+            kardexResults.classList.remove("d-none");
+            filtrados.forEach((a) => {
+              const btn = document.createElement("button");
+              btn.className =
+                "list-group-item list-group-item-action text-white bg-dark border-secondary";
+              btn.innerHTML = `<strong>${a.numero_control}</strong> - ${a.nombre} ${a.apellido_paterno}`;
+              btn.onclick = () => {
+                alumnoKardexSeleccionado = a;
+                document.getElementById("rep-kardex-nombre").textContent =
+                  `${a.nombre} ${a.apellido_paterno} ${a.apellido_materno || ""}`;
+                document.getElementById("rep-kardex-control").textContent =
+                  `No. Control: ${a.numero_control}`;
+                kardexSearch.classList.add("d-none");
+                kardexResults.classList.add("d-none");
+                kardexSelected.classList.remove("d-none");
+                btnExportKardex.disabled = false;
+              };
+              kardexResults.appendChild(btn);
+            });
+          } else {
+            kardexResults.classList.add("d-none");
+          }
+        });
+
+        // Limpiar selección
+        btnClearKardex.addEventListener("click", () => {
+          alumnoKardexSeleccionado = null;
+          kardexSearch.value = "";
+          kardexSearch.classList.remove("d-none");
+          kardexSelected.classList.add("d-none");
+          btnExportKardex.disabled = true;
+          kardexSearch.focus();
+        });
+
+        // GENERAR PDF DEL KÁRDEX
+        btnExportKardex.addEventListener("click", async () => {
+          if (!alumnoKardexSeleccionado) return;
+          try {
+            // Traemos el historial del alumno usando la ruta que ya existía
+            const historial = await window.electronAPI.invoke(
+              "get-historial-alumno",
+              alumnoKardexSeleccionado.id_alumno,
+            );
+
+            const doc = new jsPDF();
+
+            // Dibujar Encabezado
+            doc.setFontSize(18);
+            doc.setTextColor(40, 40, 40);
+            doc.text("KÁRDEX OFICIAL DE CALIFICACIONES", 105, 20, {
+              align: "center",
+            });
+
+            // Datos del Alumno
+            doc.setFontSize(11);
+            doc.text(
+              `Alumno: ${alumnoKardexSeleccionado.nombre} ${alumnoKardexSeleccionado.apellido_paterno} ${alumnoKardexSeleccionado.apellido_materno || ""}`,
+              14,
+              35,
+            );
+            doc.text(
+              `No. Control: ${alumnoKardexSeleccionado.numero_control}`,
+              14,
+              42,
+            );
+            doc.text(
+              `Estatus Actual: ${alumnoKardexSeleccionado.status}`,
+              14,
+              49,
+            );
+
+            // Preparar datos para la tabla
+            const bodyData = historial.map((h) => [
+              h.nombre_periodo,
+              h.nombre_materia,
+              h.creditos,
+              // Si es nulo ponemos "--", si es 0 (reprobada) ponemos "NA", si no, la calificación real
+              h.calificacion_final !== null
+                ? h.calificacion_final === 0
+                  ? "NA"
+                  : h.calificacion_final
+                : "--",
+              h.tipo_acreditacion || "CN",
+              h.estado_materia,
+            ]);
+
+            // Dibujar Tabla Mágica
+            doc.autoTable({
+              startY: 55,
+              head: [
+                [
+                  "Periodo",
+                  "Materia",
+                  "Créditos",
+                  "Calificación",
+                  "Acreditación",
+                  "Estatus",
+                ],
+              ],
+              body: bodyData,
+              theme: "grid",
+              headStyles: { fillColor: [67, 97, 238] }, // Color primario
+              styles: { fontSize: 9 },
+              alternateRowStyles: { fillColor: [245, 245, 245] },
+            });
+
+            // Resumen de Promedio al final
+            const materiasAprobadas = historial.filter(
+              (h) => h.calificacion_final >= 70,
+            );
+            const prom =
+              materiasAprobadas.length > 0
+                ? (
+                    materiasAprobadas.reduce(
+                      (sum, h) => sum + h.calificacion_final,
+                      0,
+                    ) / materiasAprobadas.length
+                  ).toFixed(2)
+                : 0;
+            const creditos = materiasAprobadas.reduce(
+              (sum, h) => sum + (h.creditos || 0),
+              0,
+            );
+
+            const finalY = doc.lastAutoTable.finalY || 60;
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text(
+              `Promedio General (Aprobatorio): ${prom}`,
+              14,
+              finalY + 10,
+            );
+            doc.text(`Créditos Acumulados: ${creditos}`, 14, finalY + 16);
+
+            // Guardar archivo
+            doc.save(`Kardex_${alumnoKardexSeleccionado.numero_control}.pdf`);
+          } catch (e) {
+            console.error(e);
+            window.electronAPI.invoke(
+              "dialog-alert",
+              "Error al generar el Kárdex.",
+            );
+          }
+        });
+
+        // ---------------------------------------------------------
+        // REPORTE 2: SÁBANA DE CALIFICACIONES (Excel y PDF)
+        // ---------------------------------------------------------
+        const sabPeriodo = document.getElementById("rep-sabana-periodo");
+        const sabMateria = document.getElementById("rep-sabana-materia");
+        const sabGrupo = document.getElementById("rep-sabana-grupo");
+
+        // Cargar Periodos y Materias Iniciales
+        try {
+          const periodos = await window.electronAPI.invoke("get-periodos");
+          periodos.forEach(
+            (p) =>
+              (sabPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`),
+          );
+
+          const materias = await window.electronAPI.invoke("get-materias");
+          materias.forEach(
+            (m) =>
+              (sabMateria.innerHTML += `<option value="${m.id_materia}">${m.nombre_materia}</option>`),
+          );
+        } catch (e) {}
+
+        // Cascada de Grupos
+        sabPeriodo.addEventListener("change", async (e) => {
+          sabGrupo.innerHTML = '<option value="">Seleccione grupo...</option>';
+          if (!e.target.value) return;
+          try {
+            const grupos = await window.electronAPI.invoke(
+              "get-grupos-por-periodo",
+              e.target.value,
+            );
+            grupos.forEach(
+              (g) =>
+                (sabGrupo.innerHTML += `<option value="${g.id_grupo}">${g.nombre_grupo}</option>`),
+            );
+          } catch (e) {}
+        });
+
+        // Función Auxiliar para recuperar los datos de la sábana
+        const obtenerDatosSabana = async () => {
+          const id_periodo = sabPeriodo.value;
+          const id_materia = sabMateria.value;
+          const id_grupo = sabGrupo.value;
+
+          if (!id_periodo || !id_materia || !id_grupo) {
+            await window.electronAPI.invoke(
+              "dialog-alert",
+              "Por favor selecciona Periodo, Materia y Grupo.",
+            );
+            return null;
+          }
+
+          const alumnos = await window.electronAPI.invoke(
+            "get-grupo-especifico",
+            { id_periodo, id_materia, id_grupo_fk: id_grupo },
+          );
+
+          if (alumnos.length === 0) {
+            await window.electronAPI.invoke(
+              "dialog-alert",
+              "No hay alumnos registrados en este grupo.",
+            );
+            return null;
+          }
+          return alumnos;
+        };
+
+        // EXCEL SABANA
+        document
+          .getElementById("btn-export-sabana-excel")
+          .addEventListener("click", async () => {
+            const alumnos = await obtenerDatosSabana();
+            if (!alumnos) return;
+
+            // Construimos el arreglo JSON para Excel
+            const dataExcel = alumnos.map((a) => ({
+              "No. Control": a.numero_control,
+              "Nombre Completo": `${a.apellido_paterno} ${a.apellido_materno || ""} ${a.nombre}`,
+              C1: a.c1 !== null ? a.c1 : "",
+              C2: a.c2 !== null ? a.c2 : "",
+              C3: a.c3 !== null ? a.c3 : "",
+              C4: a.c4 !== null ? a.c4 : "",
+              C5: a.c5 !== null ? a.c5 : "",
+              C6: a.c6 !== null ? a.c6 : "",
+              C7: a.c7 !== null ? a.c7 : "",
+              C8: a.c8 !== null ? a.c8 : "",
+              C9: a.c9 !== null ? a.c9 : "",
+              C10: a.c10 !== null ? a.c10 : "",
+              "Calificación Final":
+                a.calificacion_final !== null
+                  ? a.calificacion_final === 0
+                    ? "NA"
+                    : a.calificacion_final
+                  : "--",
+              "Tipo Acreditación": a.tipo_acreditacion || "CN",
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(dataExcel);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Calificaciones");
+
+            const matNombre = sabMateria.options[sabMateria.selectedIndex].text
+              .split("(")[0]
+              .trim();
+            const grpNombre = sabGrupo.options[sabGrupo.selectedIndex].text;
+
+            // Magia SheetJS
+            XLSX.writeFile(wb, `Sabana_${matNombre}_Grupo${grpNombre}.xlsx`);
+          });
+
+        // PDF SABANA
+        document
+          .getElementById("btn-export-sabana-pdf")
+          .addEventListener("click", async () => {
+            const alumnos = await obtenerDatosSabana();
+            if (!alumnos) return;
+
+            const matNombre = sabMateria.options[sabMateria.selectedIndex].text
+              .split("(")[0]
+              .trim();
+            const grpNombre = sabGrupo.options[sabGrupo.selectedIndex].text;
+            const perNombre = sabPeriodo.options[sabPeriodo.selectedIndex].text;
+
+            const doc = new jsPDF();
+            doc.setFontSize(16);
+            doc.text("SÁBANA DE CALIFICACIONES", 105, 15, { align: "center" });
+            doc.setFontSize(10);
+            doc.text(`Periodo: ${perNombre}`, 14, 25);
+            doc.text(`Materia: ${matNombre}`, 14, 31);
+            doc.text(`Grupo: ${grpNombre}`, 14, 37);
+
+            const bodyData = alumnos.map((a) => [
+              a.numero_control,
+              `${a.apellido_paterno} ${a.apellido_materno || ""} ${a.nombre}`,
+              a.calificacion_final !== null
+                ? a.calificacion_final === 0
+                  ? "NA"
+                  : a.calificacion_final
+                : "--",
+              a.tipo_acreditacion || "CN",
+            ]);
+
+            doc.autoTable({
+              startY: 42,
+              head: [["No. Control", "Alumno", "Calif. Final", "Acreditación"]],
+              body: bodyData,
+              theme: "striped",
+              headStyles: { fillColor: [25, 135, 84] }, // Color Verde
+            });
+
+            doc.save(`Sabana_${matNombre}_Grupo${grpNombre}.pdf`);
+          });
+
+        // ---------------------------------------------------------
+        // REPORTE 3: PADRÓN DE TITULADOS (Excel Maestro)
+        // ---------------------------------------------------------
+        document
+          .getElementById("btn-export-titulados-excel")
+          .addEventListener("click", async () => {
+            try {
+              const titulados =
+                await window.electronAPI.invoke("get-titulados");
+              if (titulados.length === 0) {
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "No hay alumnos titulados registrados.",
+                );
+                return;
+              }
+
+              const dataExcel = titulados.map((t) => ({
+                "Folio de Acta": t.folio_acta || "En Trámite",
+                "No. Control": t.numero_control,
+                "Nombre Completo": `${t.apellido_paterno} ${t.apellido_materno || ""} ${t.nombre}`,
+                "Promedio Final": t.promedio,
+                "Modalidad de Titulación": t.modalidad,
+                "Mención Honorífica": t.mencion_honorifica ? "Sí" : "No",
+                "Fecha de Titulación": t.fecha_titulacion,
+              }));
+
+              const ws = XLSX.utils.json_to_sheet(dataExcel);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, "Titulados");
+              XLSX.writeFile(wb, "Padron_Historico_Titulados.xlsx");
+            } catch (e) {
+              console.error(e);
+              window.electronAPI.invoke(
+                "dialog-alert",
+                "Error al generar el padrón de Excel.",
+              );
+            }
+          });
       }
     </script>
   </body>

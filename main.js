@@ -19,6 +19,49 @@ const db = new sqlite3.Database(dbPath, (err) => {
     });
   }
 });
+
+// ==========================================================
+// SCRIPT DE EXPANSIÓN A 10 COMPETENCIAS
+// ==========================================================
+db.serialize(() => {
+  db.run("ALTER TABLE Inscripciones ADD COLUMN c9 REAL", (err) => {
+    if (!err) console.log("Columna C9 agregada con éxito.");
+  });
+  db.run("ALTER TABLE Inscripciones ADD COLUMN c10 REAL", (err) => {
+    if (!err) console.log("Columna C10 agregada con éxito.");
+  });
+});
+// ==========================================================
+
+/* ==========================================================
+// SCRIPT TEMPORAL DE LIMPIEZA DE DATOS (EXORCISMO)
+// ==========================================================
+db.serialize(() => {
+  // 1. Limpiar calificaciones finales menores a 70
+  db.run(
+    `UPDATE inscripciones SET calificacion_final = 0 WHERE calificacion_final < 70 AND calificacion_final > 0`,
+    function (err) {
+      if (!err)
+        console.log(
+          `[LIMPIEZA] Calificaciones finales corregidas: ${this.changes}`,
+        );
+    },
+  );
+
+  // 2. Limpiar competencias (C1 a C8) menores a 70
+  for (let i = 1; i <= 8; i++) {
+    db.run(
+      `UPDATE inscripciones SET c${i} = 0 WHERE c${i} < 70 AND c${i} > 0`,
+      function (err) {
+        if (!err && this.changes > 0)
+          console.log(
+            `[LIMPIEZA] Competencia C${i} corregida: ${this.changes}`,
+          );
+      },
+    );
+  }
+});*/
+
 // Función global para la ventana principal
 let mainWindow;
 
@@ -357,6 +400,49 @@ ipcMain.handle("add-alumno", async (event, alumnoData) => {
         console.log(`Nuevo alumno agregado con ID: ${this.lastID}`);
         resolve({ success: true, id: this.lastID });
       }
+    });
+  });
+});
+
+/**
+ * ¡NUEVO! Importación Masiva de Alumnos desde Excel
+ */
+ipcMain.handle("add-alumnos-masivo", async (event, alumnosNuevos) => {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+
+      const stmt = db.prepare(`
+        INSERT INTO Alumnos 
+        (numero_control, nombre, apellido_paterno, apellido_materno, genero, status, id_periodo_ingreso_fk) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      let errores = 0;
+      alumnosNuevos.forEach((a) => {
+        // Ignoramos errores de duplicados silenciosamente en la transacción
+        stmt.run(
+          [
+            a.numero_control,
+            a.nombre,
+            a.apellido_paterno,
+            a.apellido_materno,
+            a.genero,
+            a.status,
+            a.id_periodo_ingreso_fk,
+          ],
+          function (err) {
+            if (err) errores++;
+          },
+        );
+      });
+
+      stmt.finalize();
+
+      db.run("COMMIT", (err) => {
+        if (err) reject(err);
+        else resolve({ success: true, errores_ignorados: errores });
+      });
     });
   });
 });
@@ -763,10 +849,40 @@ ipcMain.handle("update-materia", async (event, data) => {
   });
 });
 
+// ==========================================
+// GUARDIÁN DE CALIFICACIONES (Regla TecNM)
+// ==========================================
+function limpiarCalificacion(calif) {
+  if (calif === null || calif === undefined || calif === "") return null;
+  let num = parseFloat(calif);
+  if (isNaN(num)) return null;
+
+  if (num > 100) return 100; // Tope máximo
+  if (num > 0 && num < 70) return 0; // Regla del NA (menor a 70 es 0)
+  if (num < 0) return 0; // No existen calificaciones negativas
+
+  return num;
+}
+
 /**
  * Guarda múltiples calificaciones (ALGORITMO UPSERT: Inserta, Actualiza o Borra)
  */
 ipcMain.handle("save-calificaciones-masivas", async (event, payload) => {
+  // ---> INYECCIÓN DEL GUARDIÁN <---
+  payload.alumnos.forEach((a) => {
+    a.c1 = limpiarCalificacion(a.c1);
+    a.c2 = limpiarCalificacion(a.c2);
+    a.c3 = limpiarCalificacion(a.c3);
+    a.c4 = limpiarCalificacion(a.c4);
+    a.c5 = limpiarCalificacion(a.c5);
+    a.c6 = limpiarCalificacion(a.c6);
+    a.c7 = limpiarCalificacion(a.c7);
+    a.c8 = limpiarCalificacion(a.c8);
+    a.c9 = limpiarCalificacion(a.c9);
+    a.c10 = limpiarCalificacion(a.c10);
+    a.calificacion_final = limpiarCalificacion(a.calificacion_final);
+  });
+  // ---------------------------------
   return new Promise((resolve, reject) => {
     // Extraemos el paquete de datos estructurado que nos enviará el frontend
     const { id_periodo, id_materia, id_grupo, alumnos } = payload;
@@ -787,7 +903,7 @@ ipcMain.handle("save-calificaciones-masivas", async (event, payload) => {
         const existentes = rows.map((r) => r.id_inscripcion);
         const entrantes = alumnos
           .filter((a) => a.id_inscripcion)
-          .map((a) => a.id_inscripcion);
+          .map((a) => parseInt(a.id_inscripcion));
 
         // 2. MAGIA DE BORRADO: Si estaba en BD pero ya no está en pantalla, lo borramos (La "X" del UI)
         const aBorrar = existentes.filter((id) => !entrantes.includes(id));
@@ -798,13 +914,13 @@ ipcMain.handle("save-calificaciones-masivas", async (event, payload) => {
         // 3. Preparamos las sentencias de Insertar y Actualizar
         const stmtInsert = db.prepare(`
           INSERT INTO Inscripciones 
-          (id_alumno_fk, id_materia_fk, id_periodo_fk, id_grupo_fk, c1, c2, c3, c4, c5, c6, c7, c8, calificacion_final, estado_materia, tipo_acreditacion) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id_alumno_fk, id_materia_fk, id_periodo_fk, id_grupo_fk, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, calificacion_final, estado_materia, tipo_acreditacion) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         const stmtUpdate = db.prepare(`
           UPDATE Inscripciones SET 
-          c1=?, c2=?, c3=?, c4=?, c5=?, c6=?, c7=?, c8=?, calificacion_final=?, estado_materia=?, tipo_acreditacion=?, fecha_modificacion=CURRENT_TIMESTAMP
+          c1=?, c2=?, c3=?, c4=?, c5=?, c6=?, c7=?, c8=?, c9=?, c10=?, calificacion_final=?, estado_materia=?, tipo_acreditacion=?, fecha_modificacion=CURRENT_TIMESTAMP
           WHERE id_inscripcion=?
         `);
 
@@ -821,6 +937,8 @@ ipcMain.handle("save-calificaciones-masivas", async (event, payload) => {
               a.c6,
               a.c7,
               a.c8,
+              a.c9,
+              a.c10,
               a.calificacion_final,
               a.estado_materia,
               a.tipo_acreditacion,
@@ -841,6 +959,8 @@ ipcMain.handle("save-calificaciones-masivas", async (event, payload) => {
               a.c6,
               a.c7,
               a.c8,
+              a.c9,
+              a.c10, // <--- ¡ÉSTAS SON LAS QUE FALTABAN!
               a.calificacion_final,
               a.estado_materia,
               a.tipo_acreditacion,
@@ -892,7 +1012,7 @@ ipcMain.handle("get-historial-alumno", async (event, id_alumno) => {
         i.calificacion_final,
         i.estado_materia,
         i.tipo_acreditacion,
-        i.c1, i.c2, i.c3, i.c4, i.c5, i.c6, i.c7, i.c8,
+        i.c1, i.c2, i.c3, i.c4, i.c5, i.c6, i.c7, i.c8, i.c9, i.c10,
         i.id_periodo_fk,     
         i.id_materia_fk,     
         i.id_grupo_fk,       
@@ -919,6 +1039,9 @@ ipcMain.handle("get-historial-alumno", async (event, id_alumno) => {
  * Actualiza un registro existente (Editar desde Kárdex)
  */
 ipcMain.handle("update-inscripcion", async (event, data) => {
+  // ---> INYECCIÓN DEL GUARDIÁN <---
+  data.calificacion_final = limpiarCalificacion(data.calificacion_final);
+  // ---------------------------------
   return new Promise((resolve, reject) => {
     const {
       id_inscripcion,
@@ -955,6 +1078,9 @@ ipcMain.handle("update-inscripcion", async (event, data) => {
  * ¡NUEVO! Registra una inscripción individual (Crear desde Kárdex)
  */
 ipcMain.handle("add-inscripcion-individual", async (event, data) => {
+  // ---> INYECCIÓN DEL GUARDIÁN <---
+  data.calificacion_final = limpiarCalificacion(data.calificacion_final);
+  // ---------------------------------
   return new Promise((resolve, reject) => {
     const {
       id_alumno,
