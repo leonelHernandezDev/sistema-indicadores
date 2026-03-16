@@ -254,68 +254,99 @@
         background-color: #f43f5e;
         color: #fff;
       }
+
+      /* === 8. COLLAPSIBLE SIDEBAR === */
+      .sidebar {
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: visible; /* Para el botón */
+      }
+      .sidebar.collapsed {
+        width: 80px;
+      }
+      .sidebar.collapsed .sidebar-text {
+        display: none;
+      }
+      .sidebar.collapsed .nav-link {
+        text-align: center;
+        padding-left: 0;
+        padding-right: 0;
+        display: flex;
+        justify-content: center;
+      }
+      .sidebar.collapsed .nav-link i {
+        margin-right: 0 !important;
+        font-size: 1.3rem;
+      }
+      .logo-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 1.2rem;
+        margin-bottom: 2rem;
+        height: 40px;
+      }
+      /* Efecto hover suave en el toggle */
+      #btn-toggle-sidebar {
+        transition: transform 0.2s;
+      }
+      #btn-toggle-sidebar:hover {
+        transform: scale(1.1);
+      }
     </style>
   </head>
 
   <body>
     <div class="main-container">
       <div class="sidebar">
-        <h4 class="px-3 mb-4 text-white">Sistema Académico</h4>
+        <div class="logo-container">
+          <div class="sidebar-text">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 40" width="150" height="40">
+              <defs>
+                <linearGradient id="gradLogo" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#4361ee;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#0dcaf0;stop-opacity:1" />
+                </linearGradient>
+              </defs>
+              <rect width="30" height="30" rx="8" y="5" fill="url(#gradLogo)" />
+              <path d="M10 15 L20 10 L30 15 L20 20 Z" fill="#ffffff" opacity="0.9" />
+              <path d="M10 20 L20 25 L30 20" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.6" />
+              <text x="40" y="28" font-family="'Segoe UI', sans-serif" font-weight="800" font-size="20" fill="#ffffff" letter-spacing="1">ACAD<span fill="#4361ee">X</span></text>
+            </svg>
+          </div>
+          <button id="btn-toggle-sidebar" class="btn btn-link text-muted p-0 shadow-none border-0">
+            <i class="bi bi-list fs-3"></i>
+          </button>
+        </div>
 
         <ul class="nav nav-pills flex-column mb-auto" id="main-nav">
           <li class="nav-item">
-            <a
-              href="#"
-              class="nav-link active"
-              id="nav-inicio"
-              data-page="inicio"
-            >
-              <i class="bi bi-house-door-fill me-2"></i> Inicio
+            <a href="#" class="nav-link active" id="nav-inicio" data-page="inicio">
+              <i class="bi bi-house-door-fill me-2"></i> <span class="sidebar-text">Inicio</span>
             </a>
           </li>
           <li class="nav-item">
-            <a
-              href="#"
-              class="nav-link"
-              id="nav-alumnos"
-              data-page="gestion-alumnos"
-            >
-              <i class="bi bi-person-fill me-2"></i> Alumnos
+            <a href="#" class="nav-link" id="nav-alumnos" data-page="gestion-alumnos">
+              <i class="bi bi-person-fill me-2"></i> <span class="sidebar-text">Alumnos</span>
             </a>
           </li>
           <li class="nav-item">
-            <a
-              href="#"
-              class="nav-link"
-              id="nav-academico"
-              data-page="academico"
-            >
-              <i class="bi bi-journal-bookmark-fill me-2"></i> Académico
+            <a href="#" class="nav-link" id="nav-academico" data-page="academico">
+              <i class="bi bi-journal-bookmark-fill me-2"></i> <span class="sidebar-text">Académico</span>
             </a>
           </li>
           <li class="nav-item">
-            <a
-              href="#"
-              class="nav-link"
-              id="nav-titulacion"
-              data-page="titulacion"
-            >
-              <i class="bi bi-mortarboard-fill me-2"></i> Titulación
+            <a href="#" class="nav-link" id="nav-titulacion" data-page="titulacion">
+              <i class="bi bi-mortarboard-fill me-2"></i> <span class="sidebar-text">Titulación</span>
             </a>
           </li>
           <li class="nav-item">
             <a href="#" class="nav-link" id="nav-reportes" data-page="reportes">
-              <i class="bi bi-bar-chart-fill me-2"></i> Reportes
+              <i class="bi bi-bar-chart-fill me-2"></i> <span class="sidebar-text">Reportes</span>
             </a>
           </li>
           <li class="nav-item">
-            <a
-              href="#"
-              class="nav-link"
-              id="nav-config"
-              data-page="config-periodos"
-            >
-              <i class="bi bi-gear-fill me-2"></i> Configuración
+            <a href="#" class="nav-link" id="nav-config" data-page="config-periodos">
+              <i class="bi bi-gear-fill me-2"></i> <span class="sidebar-text">Configuración</span>
             </a>
           </li>
         </ul>
@@ -4137,6 +4168,13 @@
             }
           });
       }
+    </script>
+
+    <script>
+      // Lógica de Toggle de la Barra Lateral
+      document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
+        document.querySelector('.sidebar').classList.toggle('collapsed');
+      });
     </script>
   </body>
 </html>

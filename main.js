@@ -452,31 +452,37 @@ ipcMain.handle("add-alumnos-masivo", async (event, alumnosNuevos) => {
  */
 ipcMain.handle("delete-alumno", async (event, id_alumno) => {
   return new Promise((resolve, reject) => {
-    // Primero borramos sus inscripciones (si tiene) para mantener integridad
+    // 1. Primero borramos sus inscripciones
     db.run(
       "DELETE FROM Inscripciones WHERE id_alumno_fk = ?",
       [id_alumno],
       (err) => {
-        if (err) {
-          console.error("Error al borrar inscripciones del alumno:", err);
-          // No detenemos el proceso, intentamos borrar el alumno
-        }
+        if (err) console.error("Error al borrar inscripciones:", err);
 
-        // Ahora borramos al alumno
+        // 2. NUEVO PASO: Borramos su acta de titulación (Si es que la tiene)
         db.run(
-          "DELETE FROM Alumnos WHERE id_alumno = ?",
+          "DELETE FROM Titulados WHERE id_alumno_fk = ?",
           [id_alumno],
-          function (err) {
-            if (err) {
-              console.error("Error al eliminar alumno:", err.message);
-              reject(err);
-            } else {
-              console.log(`Alumno ${id_alumno} eliminado.`);
-              resolve({ success: true });
-            }
-          },
+          (err2) => {
+            if (err2) console.error("Error al borrar acta de titulación:", err2);
+
+            // 3. Ahora sí, con el camino libre, borramos al alumno
+            db.run(
+              "DELETE FROM Alumnos WHERE id_alumno = ?",
+              [id_alumno],
+              function (err3) {
+                if (err3) {
+                  console.error("Error al eliminar alumno:", err3.message);
+                  reject(err3);
+                } else {
+                  console.log(`Alumno ${id_alumno} y todo su rastro eliminado.`);
+                  resolve({ success: true });
+                }
+              }
+            );
+          }
         );
-      },
+      }
     );
   });
 });

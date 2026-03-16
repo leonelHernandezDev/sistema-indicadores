@@ -1,68 +1,90 @@
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1><i class="bi bi-person-plus-fill"></i> Agregar Nuevo Alumno</h1>
-  <button class="btn btn-secondary" id="btn-volver-alumnos">
-    <i class="bi bi-arrow-left"></i> Volver al listado
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="fw-bold text-white mb-0 fs-3">
+      <i class="bi bi-person-badge me-2 text-primary"></i> <span id="titulo-pagina-dummy">Agregar Nuevo Alumno</span>
+    </h1>
+    <p class="text-muted small">Ingresa los datos del estudiante en las siguientes secciones.</p>
+  </div>
+  <button class="btn btn-outline-secondary shadow-sm rounded-pill px-4" id="btn-volver-alumnos">
+    <i class="bi bi-arrow-left me-2"></i>Volver al listado
   </button>
 </div>
-<p class="lead">
-  Llena los datos para registrar un nuevo estudiante en el sistema.
-</p>
-<hr />
 
-<form id="form-alumno" class="row g-3">
-  <div class="col-md-4">
-    <label for="numero_control" class="form-label">Número de Control *</label>
-    <input type="text" class="form-control" id="numero_control" required />
-  </div>
-  <div class="col-md-8">
-    <label for="nombre" class="form-label">Nombre(s) *</label>
-    <input type="text" class="form-control" id="nombre" required />
-  </div>
+<form id="form-alumno" class="needs-validation">
+  <div class="row g-4">
+    <div class="col-xl-8">
+      <div class="card bg-dark border-secondary shadow-lg h-100 rounded-4 overflow-hidden">
+        <div class="card-header bg-black bg-opacity-50 border-secondary py-3">
+          <h6 class="mb-0 text-uppercase fw-bold text-muted"><i class="bi bi-person-lines-fill me-2"></i>Datos Personales</h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label for="nombre" class="form-label text-muted small fw-bold">Nombre(s) *</label>
+              <input type="text" class="form-control form-control-lg bg-black text-white border-secondary shadow-none focus-ring focus-ring-primary" id="nombre" required />
+            </div>
+            <div class="col-md-6">
+              <label for="apellido_paterno" class="form-label text-muted small fw-bold">Apellido Paterno *</label>
+              <input type="text" class="form-control bg-black text-white border-secondary shadow-none focus-ring focus-ring-primary" id="apellido_paterno" required />
+            </div>
+            <div class="col-md-6">
+              <label for="apellido_materno" class="form-label text-muted small fw-bold">Apellido Materno</label>
+              <input type="text" class="form-control bg-black text-white border-secondary shadow-none focus-ring focus-ring-primary" id="apellido_materno" />
+            </div>
+            <div class="col-md-6">
+              <label for="genero" class="form-label text-muted small fw-bold">Género</label>
+              <select id="genero" class="form-select bg-black text-white border-secondary shadow-none focus-ring focus-ring-primary">
+                <option value="Masculino" selected>Masculino</option>
+                <option value="Femenino">Femenino</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="fecha_nacimiento" class="form-label text-muted small fw-bold">Fecha de Nacimiento</label>
+              <input type="date" class="form-control bg-black text-white border-secondary shadow-none focus-ring focus-ring-primary" id="fecha_nacimiento" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  <div class="col-md-6">
-    <label for="apellido_paterno" class="form-label">Apellido Paterno *</label>
-    <input type="text" class="form-control" id="apellido_paterno" required />
-  </div>
-  <div class="col-md-6">
-    <label for="apellido_materno" class="form-label">Apellido Materno</label>
-    <input type="text" class="form-control" id="apellido_materno" />
-  </div>
-
-  <div class="col-md-4">
-    <label for="genero" class="form-label">Género</label>
-    <select id="genero" class="form-select">
-      <option value="Masculino" selected>Masculino</option>
-      <option value="Femenino">Femenino</option>
-      <option value="Otro">Otro</option>
-    </select>
-  </div>
-  <div class="col-md-4">
-    <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
-    <input type="date" class="form-control" id="fecha_nacimiento" />
-  </div>
-  <div class="col-md-4">
-    <label for="status" class="form-label">Status *</label>
-    <select id="status" class="form-select">
-      <option value="Activo" selected>Activo</option>
-      <option value="Egresado">Egresado</option>
-      <option value="Desertor">Desertor</option>
-    </select>
-  </div>
-
-  <div class="col-md-6">
-    <label for="id_periodo_ingreso_fk" class="form-label"
-      >Periodo de Ingreso *</label
-    >
-    <select id="id_periodo_ingreso_fk" class="form-select" required>
-      <option value="" selected disabled>Cargando periodos...</option>
-    </select>
-  </div>
-
-  <div class="col-12 mt-4">
-    <button type="submit" class="btn btn-primary btn-lg">
-      <i class="bi bi-save-fill"></i> Guardar Alumno
-    </button>
+    <div class="col-xl-4">
+      <div class="card bg-dark border-secondary shadow-lg h-100 rounded-4 overflow-hidden">
+        <div class="card-header bg-black bg-opacity-50 border-secondary py-3">
+          <h6 class="mb-0 text-uppercase fw-bold text-muted"><i class="bi bi-mortarboard-fill me-2"></i>Datos Académicos</h6>
+        </div>
+        <div class="card-body p-4 d-flex flex-column">
+          <div class="mb-3">
+            <label for="numero_control" class="form-label text-muted small fw-bold">Número de Control *</label>
+            <div class="input-group shadow-sm rounded-3">
+              <span class="input-group-text bg-black border-secondary text-primary border-end-0"><i class="bi bi-hash fs-5"></i></span>
+              <input type="text" class="form-control bg-black text-white border-secondary border-start-0 font-monospace fw-bold fs-5 shadow-none focus-ring focus-ring-primary" id="numero_control" required />
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="id_periodo_ingreso_fk" class="form-label text-muted small fw-bold">Periodo de Ingreso *</label>
+            <select id="id_periodo_ingreso_fk" class="form-select bg-black text-white border-secondary shadow-none focus-ring focus-ring-primary" required>
+              <option value="" selected disabled>Cargando periodos...</option>
+            </select>
+          </div>
+          <div class="mb-auto">
+            <label for="status" class="form-label text-muted small fw-bold">Status Institucional *</label>
+            <select id="status" class="form-select bg-black text-white border-secondary shadow-none focus-ring focus-ring-primary">
+              <option value="Activo" selected>Activo</option>
+              <option value="Egresado">Egresado</option>
+              <option value="Desertor">Desertor</option>
+            </select>
+          </div>
+          
+          <div class="mt-4 pt-3 border-top border-secondary">
+            <button type="submit" class="btn btn-primary btn-lg w-100 shadow-lg rounded-3 fw-bold" style="letter-spacing: 0.5px;">
+              <i class="bi bi-save-fill me-2"></i> Guardar Alumno
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </form>
 
-<div id="form-message" class="alert mt-3 d-none" role="alert"></div>
+<div id="form-message" class="alert shadow-sm rounded-3 mt-4 d-none fw-bold" role="alert"></div>

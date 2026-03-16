@@ -143,23 +143,28 @@
             ignorados.
           </div>
 
-          <div
-            class="table-responsive border border-secondary rounded"
-            style="max-height: 400px; overflow-y: auto"
-          >
-            <table
-              class="table table-sm table-dark table-hover align-middle mb-0"
-              style="font-size: 0.85rem"
-            >
+          <div class="table-responsive bg-dark rounded-3 shadow-lg border border-secondary" style="max-height: 400px; overflow-y: auto">
+            <style>
+              .alumno-import-row input, .alumno-import-row select {
+                transition: all 0.2s ease-in-out;
+              }
+              .alumno-import-row input:focus, .alumno-import-row select:focus {
+                background-color: #000 !important;
+                border-color: #4361ee !important;
+                box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25) !important;
+              }
+              .alumno-import-row td { vertical-align: middle; }
+            </style>
+            <table class="table table-dark table-hover align-middle mb-0" style="font-size: 0.85rem">
               <thead style="position: sticky; top: 0; z-index: 5">
                 <tr>
-                  <th class="bg-black">N° Control</th>
-                  <th class="bg-black">Nombre(s)</th>
-                  <th class="bg-black">Ap. Paterno</th>
-                  <th class="bg-black">Ap. Materno</th>
-                  <th class="bg-black">Género</th>
-                  <th class="bg-black">Periodo</th>
-                  <th class="bg-black">Estatus</th>
+                  <th class="bg-black text-muted text-uppercase small fw-bold border-bottom border-secondary">N° Control</th>
+                  <th class="bg-black text-muted text-uppercase small fw-bold border-bottom border-secondary">Nombre(s)</th>
+                  <th class="bg-black text-muted text-uppercase small fw-bold border-bottom border-secondary">Ap. Paterno</th>
+                  <th class="bg-black text-muted text-uppercase small fw-bold border-bottom border-secondary">Ap. Materno</th>
+                  <th class="bg-black text-muted text-uppercase small fw-bold border-bottom border-secondary">Género</th>
+                  <th class="bg-black text-muted text-uppercase small fw-bold border-bottom border-secondary">Periodo</th>
+                  <th class="bg-black text-muted text-uppercase small fw-bold border-bottom border-secondary">Estatus</th>
                 </tr>
               </thead>
               <tbody id="import-table-body"></tbody>
