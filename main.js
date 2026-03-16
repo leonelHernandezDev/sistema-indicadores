@@ -1050,10 +1050,22 @@ ipcMain.handle("update-inscripcion", async (event, data) => {
       id_grupo_fk,
       calificacion_final,
       estado_materia,
+      tipo_acreditacion, // <-- Recibimos acreditación
+      c1,
+      c2,
+      c3,
+      c4,
+      c5,
+      c6,
+      c7,
+      c8,
+      c9,
+      c10, // <-- RECIBIMOS LAS COMPETENCIAS
     } = data;
+
     const sql = `
       UPDATE Inscripciones 
-      SET id_periodo_fk = ?, id_materia_fk = ?, id_grupo_fk = ?, calificacion_final = ?, estado_materia = ?, fecha_modificacion = CURRENT_TIMESTAMP
+      SET id_periodo_fk = ?, id_materia_fk = ?, id_grupo_fk = ?, calificacion_final = ?, estado_materia = ?, tipo_acreditacion = ?, c1 = ?, c2 = ?, c3 = ?, c4 = ?, c5 = ?, c6 = ?, c7 = ?, c8 = ?, c9 = ?, c10 = ?, fecha_modificacion = CURRENT_TIMESTAMP
       WHERE id_inscripcion = ?
     `;
     db.run(
@@ -1064,6 +1076,17 @@ ipcMain.handle("update-inscripcion", async (event, data) => {
         id_grupo_fk,
         calificacion_final,
         estado_materia,
+        tipo_acreditacion || "CN",
+        c1,
+        c2,
+        c3,
+        c4,
+        c5,
+        c6,
+        c7,
+        c8,
+        c9,
+        c10, // <-- LAS PASAMOS AL SQL
         id_inscripcion,
       ],
       function (err) {
@@ -1089,6 +1112,17 @@ ipcMain.handle("add-inscripcion-individual", async (event, data) => {
       id_grupo_fk,
       calificacion_final,
       estado_materia,
+      tipo_acreditacion, // <-- Recibimos si es Ordinario, Intersemestral, etc.
+      c1,
+      c2,
+      c3,
+      c4,
+      c5,
+      c6,
+      c7,
+      c8,
+      c9,
+      c10, // <-- RECIBIMOS LAS COMPETENCIAS
     } = data;
 
     // Protegemos que no lo inscriban dos veces en la misma materia/periodo
@@ -1103,7 +1137,8 @@ ipcMain.handle("add-inscripcion-individual", async (event, data) => {
           ),
         );
 
-      const sql = `INSERT INTO Inscripciones (id_alumno_fk, id_materia_fk, id_periodo_fk, id_grupo_fk, calificacion_final, estado_materia, tipo_acreditacion) VALUES (?, ?, ?, ?, ?, ?, 'CN')`;
+      // Agregamos las variables a la consulta SQL
+      const sql = `INSERT INTO Inscripciones (id_alumno_fk, id_materia_fk, id_periodo_fk, id_grupo_fk, calificacion_final, estado_materia, tipo_acreditacion, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       db.run(
         sql,
         [
@@ -1113,6 +1148,17 @@ ipcMain.handle("add-inscripcion-individual", async (event, data) => {
           id_grupo_fk,
           calificacion_final,
           estado_materia,
+          tipo_acreditacion || "CN", // Por defecto CN por si acaso
+          c1,
+          c2,
+          c3,
+          c4,
+          c5,
+          c6,
+          c7,
+          c8,
+          c9,
+          c10, // <-- LAS PASAMOS AL SQL
         ],
         function (err) {
           if (err) reject(err);

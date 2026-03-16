@@ -194,17 +194,169 @@
                       <option value="">Seleccione Periodo primero...</option>
                     </select>
                   </div>
+                  <div class="row mb-2">
+                    <div class="col-12">
+                      <div class="form-check form-switch mb-0">
+                        <input
+                          class="form-check-input bg-primary border-primary"
+                          type="checkbox"
+                          id="acad-switch-modalidad"
+                        />
+                        <label
+                          class="form-check-label text-white small fw-bold"
+                          for="acad-switch-modalidad"
+                          id="acad-lbl-modalidad"
+                        >
+                          Captura Histórica (Final)
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    class="bg-black p-2 rounded border border-secondary border-opacity-25 mb-3 d-none"
+                    id="acad-container-competencias"
+                  >
+                    <div
+                      class="d-flex justify-content-between align-items-center mb-2"
+                    >
+                      <span class="text-info small fw-bold"
+                        ><i class="bi bi-ui-checks-grid"></i> Parciales</span
+                      >
+                      <div class="d-flex align-items-center gap-2">
+                        <label class="text-muted small mb-0">Unidades:</label>
+                        <select
+                          id="acad-select-num-competencias"
+                          class="form-select form-select-sm bg-dark text-white border-secondary"
+                          style="width: 70px"
+                        >
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4" selected>4</option>
+                          <option value="5">5</option>
+                          <option value="6">6</option>
+                          <option value="7">7</option>
+                          <option value="8">8</option>
+                          <option value="9">9</option>
+                          <option value="10">10</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="row g-1">
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c1"
+                          placeholder="C1"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c2"
+                          placeholder="C2"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c3"
+                          placeholder="C3"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c4"
+                          placeholder="C4"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c5"
+                          placeholder="C5"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c6"
+                          placeholder="C6"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c7"
+                          placeholder="C7"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c8"
+                          placeholder="C8"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c9"
+                          placeholder="C9"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div class="col-3">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm acad-input-parcial bg-dark text-white border-secondary text-center"
+                          id="acad-c10"
+                          placeholder="C10"
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div class="row g-2 mb-3">
                     <div class="col-6">
                       <label class="form-label text-muted small mb-0"
                         >Calif. Final</label
                       >
                       <input
-                        type="number"
+                        type="text"
                         id="acad-calificacion"
                         class="form-control text-center text-white fw-bold"
-                        min="0"
-                        max="100"
                       />
                     </div>
                     <div class="col-6">

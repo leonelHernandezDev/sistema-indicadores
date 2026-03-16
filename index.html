@@ -2069,6 +2069,66 @@
           });
         }
 
+        // --- NUEVO: INTELIGENCIA PARA AUTO-DETECTAR COMPETENCIAS DEL GRUPO ---
+        if (acadGrupo) {
+          acadGrupo.addEventListener("change", async (e) => {
+            const id_grupo = e.target.value;
+            const id_materia = acadMateria.value;
+            const id_periodo = acadPeriodo.value;
+            if (!id_grupo || !id_materia || !id_periodo) return;
+
+            try {
+              const alumnosGrupo = await window.electronAPI.invoke(
+                "get-grupo-especifico",
+                { id_periodo, id_materia, id_grupo_fk: id_grupo },
+              );
+
+              const numCompSelect = document.getElementById(
+                "acad-select-num-competencias",
+              );
+
+              if (alumnosGrupo.length > 0) {
+                const sample = alumnosGrupo.find(
+                  (a) => a.c1 !== null || a.c2 !== null,
+                );
+                if (sample) {
+                  let maxC = 0;
+                  for (let i = 10; i >= 1; i--) {
+                    if (sample[`c${i}`] !== null) {
+                      maxC = i;
+                      break;
+                    }
+                  }
+                  if (maxC > 0) {
+                    const switchMod = document.getElementById(
+                      "acad-switch-modalidad",
+                    );
+                    switchMod.checked = true;
+                    switchMod.dispatchEvent(new Event("change"));
+
+                    numCompSelect.value = Math.max(maxC, 4);
+                    numCompSelect.dispatchEvent(new Event("change"));
+
+                    // ¡EL CANDADO! Bloquea el select para no arruinar el grupo
+                    numCompSelect.disabled = true;
+                  }
+                } else {
+                  const switchMod = document.getElementById(
+                    "acad-switch-modalidad",
+                  );
+                  switchMod.checked = false;
+                  switchMod.dispatchEvent(new Event("change"));
+                  numCompSelect.disabled = false;
+                }
+              } else {
+                numCompSelect.disabled = false; // Grupo nuevo = sin candado
+              }
+            } catch (error) {
+              console.error("Error auto-detectando grupo:", error);
+            }
+          });
+        }
+
         if (acadSearch) {
           acadSearch.addEventListener("input", (e) => {
             const val = e.target.value.toLowerCase().trim();
@@ -2115,9 +2175,22 @@
 
           // PILAR 6: Control del Botón Desplegable de Estatus
           const btnStatus = document.getElementById("acad-alumno-status-btn");
-          btnStatus.textContent = alumno.status;
-          btnStatus.className = `btn btn-sm dropdown-toggle text-white border-0 ${alumno.status === "Activo" ? "bg-success" : alumno.status === "Baja Temporal" ? "bg-warning text-dark" : alumno.status === "Egresado" ? "bg-info text-dark" : "bg-danger"}`;
+          btnStatus.innerHTML = alumno.status;
+          btnStatus.className = `btn btn-sm dropdown-toggle text-white border-0 shadow-sm ${alumno.status === "Activo" ? "bg-success" : alumno.status === "Baja Temporal" ? "bg-warning text-dark" : alumno.status === "Egresado" ? "bg-info text-dark" : "bg-danger"}`;
+          btnStatus.setAttribute("data-bs-toggle", "dropdown");
           btnStatus.disabled = false;
+
+          // FUERZA BRUTA: Le quitamos el control automático a Bootstrap y lo forzamos a abrir por código
+          btnStatus.onclick = function (e) {
+            e.preventDefault();
+            try {
+              const bsDropdown =
+                bootstrap.Dropdown.getOrCreateInstance(btnStatus);
+              bsDropdown.toggle();
+            } catch (err) {
+              console.error("Error forzando Bootstrap:", err);
+            }
+          };
 
           acadWorkspace.style.opacity = "1";
           acadWorkspace.style.pointerEvents = "auto";
@@ -2255,6 +2328,11 @@
                     data-grupo="${reg.id_grupo_fk}"
                     data-calif="${reg.calificacion_final !== null ? reg.calificacion_final : ""}"
                     data-acreditacion="${reg.tipo_acreditacion || "CN"}"
+                    data-c1="${reg.c1 !== null ? reg.c1 : ""}" data-c2="${reg.c2 !== null ? reg.c2 : ""}"
+                    data-c3="${reg.c3 !== null ? reg.c3 : ""}" data-c4="${reg.c4 !== null ? reg.c4 : ""}"
+                    data-c5="${reg.c5 !== null ? reg.c5 : ""}" data-c6="${reg.c6 !== null ? reg.c6 : ""}"
+                    data-c7="${reg.c7 !== null ? reg.c7 : ""}" data-c8="${reg.c8 !== null ? reg.c8 : ""}"
+                    data-c9="${reg.c9 !== null ? reg.c9 : ""}" data-c10="${reg.c10 !== null ? reg.c10 : ""}"
                     title="Editar registro">
                     <i class="bi bi-pencil"></i>
                   </button>
@@ -2321,9 +2399,62 @@
               }
 
               acadCalificacion.value = btnEditar.dataset.calif;
-              // ---> INYECCIÓN <---
               document.getElementById("acad-acreditacion").value =
                 btnEditar.dataset.acreditacion || "CN";
+
+              // ---> INYECCIÓN SEGURA: CARGAR COMPETENCIAS AL EDITAR <---
+              let maxActivo = 0;
+              for (let i = 1; i <= 10; i++) {
+                // Leemos del dataset del botón
+                const val = btnEditar.dataset[`c${i}`];
+                const inputDom = document.getElementById(`acad-c${i}`);
+                if (inputDom) {
+                  // Si el valor no es nulo ni vacío, lo asignamos
+                  if (
+                    val &&
+                    val !== "null" &&
+                    val !== "undefined" &&
+                    val !== ""
+                  ) {
+                    inputDom.value = val;
+                    maxActivo = i; // Detectamos hasta qué casilla se usó
+                  } else {
+                    inputDom.value = "";
+                  }
+                }
+              }
+
+              // Usamos nombres únicos para evitar choques de variables
+              const elSwitch = document.getElementById("acad-switch-modalidad");
+              const elSelectUnidades = document.getElementById(
+                "acad-select-num-competencias",
+              );
+
+              if (maxActivo > 0) {
+                // Encendemos el modo competencias
+                elSwitch.checked = true;
+                elSwitch.dispatchEvent(new Event("change"));
+
+                // Ajustamos el número de casillas visibles
+                elSelectUnidades.disabled = false;
+                elSelectUnidades.value = Math.max(maxActivo, 4); // Mínimo 4 por estética
+                elSelectUnidades.dispatchEvent(new Event("change"));
+
+                // Disparamos el 'blur' para que se aplique el color rojo/azul y calcule
+                for (let i = 1; i <= maxActivo; i++) {
+                  const inputDom = document.getElementById(`acad-c${i}`);
+                  if (inputDom && inputDom.value !== "") {
+                    inputDom.dispatchEvent(new Event("blur"));
+                  }
+                }
+              } else {
+                // Apagamos el modo competencias porque fue captura histórica
+                if (elSwitch) {
+                  elSwitch.checked = false;
+                  elSwitch.dispatchEvent(new Event("change"));
+                }
+              }
+              // ----------------------------------------------------
 
               // Cambiar aspecto del botón principal
               if (btnGuardarKardex) {
@@ -2385,12 +2516,51 @@
             e.preventDefault();
             if (!alumnoSeleccionado) return;
 
-            const califNum = acadCalificacion.value
-              ? parseFloat(acadCalificacion.value)
-              : null;
+            // --- CORRECCIÓN DEL BUG "NA" ---
+            let califNum = null;
+            const valorVisual = acadCalificacion.value.trim().toUpperCase();
+
+            // Traductor: Si visualmente dice NA, a la base de datos viaja un 0
+            if (valorVisual === "NA") {
+              califNum = 0;
+            } else if (valorVisual !== "") {
+              califNum = parseFloat(valorVisual);
+            }
+
+            // Seguro anti-errores por si se cuela un texto raro
+            if (isNaN(califNum)) califNum = null;
+
             let estado = "Cursando";
-            if (califNum !== null)
+            if (califNum !== null) {
               estado = califNum >= 70 ? "Aprobada" : "Reprobada";
+            }
+            // --------------------------------
+
+            // --- EXTRAER C1-C10 ---
+            const switchMod = document.getElementById("acad-switch-modalidad");
+            const selectNumComp = document.getElementById(
+              "acad-select-num-competencias",
+            );
+            const comps = {
+              c1: null,
+              c2: null,
+              c3: null,
+              c4: null,
+              c5: null,
+              c6: null,
+              c7: null,
+              c8: null,
+              c9: null,
+              c10: null,
+            };
+
+            if (switchMod && switchMod.checked) {
+              const maxC = parseInt(selectNumComp.value);
+              for (let i = 1; i <= maxC; i++) {
+                const val = document.getElementById(`acad-c${i}`).value;
+                if (val !== "") comps[`c${i}`] = parseFloat(val);
+              }
+            }
 
             try {
               if (idInscripcionAEditar) {
@@ -2400,11 +2570,11 @@
                   id_periodo_fk: acadPeriodo.value,
                   id_materia_fk: acadMateria.value,
                   id_grupo_fk: acadGrupo.value,
-                  calificacion_final: califNum, // Campo de la nueva base de datos
+                  calificacion_final: califNum,
                   estado_materia: estado,
-                  // ---> INYECCIÓN <---
                   tipo_acreditacion:
                     document.getElementById("acad-acreditacion").value,
+                  ...comps, // <-- INYECCIÓN DE COMPETENCIAS A LA BD
                 });
                 await window.electronAPI.invoke(
                   "dialog-alert",
@@ -2428,12 +2598,13 @@
                   id_periodo: acadPeriodo.value,
                   id_materia: acadMateria.value,
                   id_grupo_fk: acadGrupo.value,
-                  calificacion_final: califNum, // Campo de la nueva base de datos
+                  calificacion_final: califNum,
                   estado_materia: estado,
                   tipo_acreditacion:
                     document.getElementById("acad-acreditacion").value,
+                  ...comps, // <-- INYECCIÓN DE COMPETENCIAS A LA BD
                 };
-                // Usamos el canal seguro e individual, ¡No el masivo de la sábana!
+
                 await window.electronAPI.invoke(
                   "add-inscripcion-individual",
                   datos,
@@ -2453,6 +2624,134 @@
               );
             }
           });
+        }
+
+        // =========================================================
+        // ⚡ MOTOR DEL KÁRDEX: Switch y Calculadora por Competencias
+        // =========================================================
+        const acadSwitchMod = document.getElementById("acad-switch-modalidad");
+        const acadLblMod = document.getElementById("acad-lbl-modalidad");
+        const acadContComp = document.getElementById(
+          "acad-container-competencias",
+        );
+        const acadInputFinal = document.getElementById("acad-calificacion");
+        const acadInputsParciales = document.querySelectorAll(
+          ".acad-input-parcial",
+        );
+        const acadSelectNumComp = document.getElementById(
+          "acad-select-num-competencias",
+        );
+
+        if (acadSwitchMod) {
+          acadSwitchMod.addEventListener("change", (e) => {
+            const isCompetencias = e.target.checked;
+            if (isCompetencias) {
+              acadLblMod.textContent = "Captura por Competencias";
+              acadContComp.classList.remove("d-none");
+              acadInputFinal.readOnly = true;
+              calcularPromedioKardex();
+            } else {
+              acadLblMod.textContent = "Captura Histórica (Final)";
+              acadContComp.classList.add("d-none");
+              acadInputFinal.readOnly = false;
+              acadInputFinal.value = "";
+              acadInputFinal.classList.remove("text-danger", "text-white");
+            }
+          });
+
+          if (acadSelectNumComp) {
+            acadSelectNumComp.addEventListener("change", (e) => {
+              const num = parseInt(e.target.value);
+              for (let i = 1; i <= 10; i++) {
+                const inputCol = document
+                  .getElementById(`acad-c${i}`)
+                  .closest("div.col-3");
+                if (i <= num) {
+                  inputCol.classList.remove("d-none");
+                } else {
+                  inputCol.classList.add("d-none");
+                  document.getElementById(`acad-c${i}`).value = "";
+                  document
+                    .getElementById(`acad-c${i}`)
+                    .classList.remove("text-danger", "text-info");
+                }
+              }
+              calcularPromedioKardex();
+            });
+            acadSelectNumComp.dispatchEvent(new Event("change"));
+          }
+
+          // REGLAS ESTRICTAS DE VALIDACIÓN
+          acadInputsParciales.forEach((input) => {
+            // Bloquear letras y signos
+            input.addEventListener("keydown", (e) => {
+              if (["e", "E", "+", "-", "."].includes(e.key)) e.preventDefault();
+            });
+
+            // Limitar a 100 y calcular mientras escribe
+            input.addEventListener("input", (e) => {
+              if (e.target.value !== "") {
+                let val = parseInt(e.target.value);
+                if (val > 100) e.target.value = 100;
+                if (val < 0) e.target.value = 0;
+              }
+              calcularPromedioKardex();
+            });
+
+            // Regla de 70 = 0 (NA) al salir de la casilla
+            input.addEventListener("blur", (e) => {
+              if (e.target.value !== "") {
+                let val = parseInt(e.target.value);
+                if (val < 70) {
+                  e.target.value = 0;
+                }
+                e.target.classList.remove("text-danger", "text-info");
+                e.target.classList.add(
+                  parseInt(e.target.value) < 70 ? "text-danger" : "text-info",
+                );
+                calcularPromedioKardex();
+              }
+            });
+          });
+
+          function calcularPromedioKardex() {
+            if (!acadSwitchMod.checked) return;
+
+            let suma = 0;
+            let completadas = 0;
+            let reprobada = false;
+            const numCompetencias = parseInt(acadSelectNumComp.value);
+
+            for (let i = 1; i <= numCompetencias; i++) {
+              const valStr = document.getElementById(`acad-c${i}`).value;
+              if (valStr !== "") {
+                let val = parseFloat(valStr);
+                suma += val;
+                completadas++;
+                if (val < 70) reprobada = true;
+              }
+            }
+
+            if (completadas > 0) {
+              let promedio = Math.round(suma / completadas);
+              if (reprobada) {
+                acadInputFinal.value = "NA";
+                acadInputFinal.classList.remove("text-white");
+                acadInputFinal.classList.add("text-danger", "fw-bold");
+              } else {
+                acadInputFinal.value = promedio;
+                acadInputFinal.classList.remove("text-danger");
+                acadInputFinal.classList.add("text-white", "fw-bold");
+              }
+            } else {
+              acadInputFinal.value = "";
+              acadInputFinal.classList.remove(
+                "text-danger",
+                "text-white",
+                "fw-bold",
+              );
+            }
+          }
         }
 
         // ==========================================
@@ -3394,8 +3693,16 @@
           }
           window.cambiosSinGuardarSabana = false;
           sabanaWorkspace.classList.add("d-none");
-          document.getElementById("sabana-empty-state").classList.add("d-none");
+
+          // ¡Aquí estaba el error! Hay que REMOVER el d-none y agregar el d-flex para que vuelva a verse
+          const emptyState = document.getElementById("sabana-empty-state");
+          emptyState.classList.remove("d-none");
+          emptyState.classList.add("d-flex");
+
           alumnosEnSabana = [];
+
+          // Opcional: Limpiamos los selects superiores para que se vea como nuevo
+          document.getElementById("form-filtros-sabana").reset();
         });
 
         // ==========================================
