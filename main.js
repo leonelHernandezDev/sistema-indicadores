@@ -645,11 +645,33 @@ ipcMain.handle("get-grupos-por-periodo", async (event, id_periodo) => {
 
 ipcMain.handle("delete-grupo", async (event, id_grupo) => {
   return new Promise((resolve, reject) => {
-    const sql = "DELETE FROM Grupos WHERE id_grupo = ?";
-    db.run(sql, [id_grupo], function (err) {
-      if (err) reject(err);
-      else resolve({ success: true });
-    });
+    // 1. El Guardián: Verificamos si hay alumnos usando este grupo
+    db.get(
+      "SELECT COUNT(*) as total FROM Inscripciones WHERE id_grupo_fk = ?",
+      [id_grupo],
+      (err, row) => {
+        if (err) return reject(err);
+
+        if (row.total > 0) {
+          // Bloqueamos la eliminación y lanzamos un error claro
+          return reject(
+            new Error(
+              `PROTECCIÓN ACTIVADA: No se puede eliminar este grupo porque contiene ${row.total} registro(s) de calificaciones de alumnos. Debes reasignar o borrar a esos alumnos primero.`,
+            ),
+          );
+        }
+
+        // 2. Si el grupo está vacío (0 alumnos), permitimos borrarlo
+        db.run(
+          "DELETE FROM Grupos WHERE id_grupo = ?",
+          [id_grupo],
+          function (err) {
+            if (err) reject(err);
+            else resolve({ success: true });
+          },
+        );
+      },
+    );
   });
 });
 
@@ -1428,6 +1450,13 @@ ipcMain.handle("get-dashboard-zona1", async (event, filtroAnos) => {
         GROUP BY p.id_periodo ORDER BY p.nombre DESC ${limitQuery}
       `);
 
+      // ---> INYECCIÓN A.1: CAPTACIÓN DE NUEVOS INGRESOS <---
+      const captacion = await runAll(`
+        SELECT p.nombre as periodo, COUNT(a.id_alumno) as nuevos_ingresos
+        FROM Alumnos a JOIN PeriodosEscolares p ON a.id_periodo_ingreso_fk = p.id_periodo
+        GROUP BY p.id_periodo ORDER BY p.nombre DESC ${limitQuery}
+      `);
+
       const demografia = await runAll(
         `SELECT genero, COUNT(*) as total FROM Alumnos GROUP BY genero`,
       );
@@ -1450,6 +1479,7 @@ ipcMain.handle("get-dashboard-zona1", async (event, filtroAnos) => {
         kpis,
         evolucion: evolucion.reverse(),
         evolucionPromedio: evolucionPromedio.reverse(),
+        captacion: captacion.reverse(), // <-- ENVIAMOS EL DATO AL FRONTEND
         demografia,
         modalidades,
         desercion,
@@ -1529,9 +1559,172 @@ ipcMain.handle("get-dashboard-zona3", async (event, data) => {
         params,
       );
 
-      resolve({ kpis, competencias, acreditacion, alumnos, intentos });
+      // ---> INYECCIÓN A.4: COMPARATIVA DE TODOS LOS GRUPOS <---
+      const comparativaGrupos = await runAll(
+        `
+        SELECT g.nombre_grupo, 
+               COUNT(i.id_inscripcion) as total_alumnos, 
+               SUM(CASE WHEN i.estado_materia = 'Reprobada' OR i.calificacion_final < 70 THEN 1 ELSE 0 END) as reprobados 
+        FROM Inscripciones i 
+        JOIN Grupos g ON i.id_grupo_fk = g.id_grupo 
+        WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? 
+        GROUP BY g.id_grupo
+      `,
+        [id_periodo, id_materia],
+      );
+
+      // ---> INYECCIÓN A.5: HISTÓRICO DE DIFICULTAD DE LA MATERIA <---
+      const historicoMateria = await runAll(
+        `
+        SELECT p.nombre as periodo, 
+               AVG(i.calificacion_final) as promedio, 
+               SUM(CASE WHEN i.estado_materia = 'Reprobada' OR i.calificacion_final < 70 THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(i.id_inscripcion), 0) as porcentaje_reprobacion 
+        FROM Inscripciones i 
+        JOIN PeriodosEscolares p ON i.id_periodo_fk = p.id_periodo 
+        WHERE i.id_materia_fk = ? 
+        GROUP BY p.id_periodo 
+        ORDER BY p.nombre ASC
+      `,
+        [id_materia],
+      );
+
+      resolve({
+        kpis,
+        competencias,
+        acreditacion,
+        alumnos,
+        intentos,
+        comparativaGrupos,
+        historicoMateria,
+      });
     } catch (error) {
       reject(error);
     }
+  });
+});
+
+// --- ZONA COHORTE: ANÁLISIS DE GENERACIÓN ---
+ipcMain.handle("get-dashboard-cohorte", async (event, id_periodo_ingreso) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const runGet = (sql, params) =>
+        new Promise((res, rej) =>
+          db.get(sql, params, (err, row) => (err ? rej(err) : res(row))),
+        );
+      const runAll = (sql, params) =>
+        new Promise((res, rej) =>
+          db.all(sql, params, (err, rows) => (err ? rej(err) : res(rows))),
+        );
+
+      // 1. Contador de estatus de toda la generación
+      const statusCounts = await runAll(
+        `
+        SELECT status, COUNT(*) as total
+        FROM Alumnos
+        WHERE id_periodo_ingreso_fk = ?
+        GROUP BY status
+      `,
+        [id_periodo_ingreso],
+      );
+
+      // 2. Top materias "Filtro" (las que más reprobó esta generación en toda su historia)
+      const materiasFiltro = await runAll(
+        `
+        SELECT m.nombre_materia, COUNT(i.id_inscripcion) as reprobados
+        FROM Inscripciones i
+        JOIN Materias m ON i.id_materia_fk = m.id_materia
+        JOIN Alumnos a ON i.id_alumno_fk = a.id_alumno
+        WHERE a.id_periodo_ingreso_fk = ? AND i.estado_materia = 'Reprobada'
+        GROUP BY m.id_materia
+        ORDER BY reprobados DESC
+        LIMIT 5
+      `,
+        [id_periodo_ingreso],
+      );
+
+      // 3. Promedio generacional histórico (solo de las que aprobaron)
+      const promedioGen = await runGet(
+        `
+        SELECT AVG(i.calificacion_final) as promedio
+        FROM Inscripciones i
+        JOIN Alumnos a ON i.id_alumno_fk = a.id_alumno
+        WHERE a.id_periodo_ingreso_fk = ? AND i.calificacion_final >= 70
+      `,
+        [id_periodo_ingreso],
+      );
+
+      resolve({ statusCounts, materiasFiltro, promedioGen });
+    } catch (error) {
+      reject(error);
+    }
+  });
+});
+
+// ==========================================
+//    MÓDULO DE REPORTES OFICIALES (PDF)
+// ==========================================
+
+ipcMain.handle("get-alerta-temprana", async (event, id_periodo) => {
+  return new Promise((resolve, reject) => {
+    // 1. Buscamos a TODOS los alumnos inscritos en este periodo y calculamos en qué intento van
+    const sql = `
+      SELECT 
+        a.id_alumno, a.numero_control, a.nombre, a.apellido_paterno, a.apellido_materno,
+        m.nombre_materia,
+        i.calificacion_final, i.estado_materia,
+        (SELECT COUNT(*) FROM Inscripciones sub WHERE sub.id_alumno_fk = i.id_alumno_fk AND sub.id_materia_fk = i.id_materia_fk AND sub.id_periodo_fk <= i.id_periodo_fk) as num_intento
+      FROM Inscripciones i
+      JOIN Alumnos a ON i.id_alumno_fk = a.id_alumno
+      JOIN Materias m ON i.id_materia_fk = m.id_materia
+      WHERE i.id_periodo_fk = ?
+    `;
+
+    db.all(sql, [id_periodo], (err, rows) => {
+      if (err) return reject(err);
+
+      const alumnosRiesgo = {};
+
+      // 2. Agrupamos los datos por alumno
+      rows.forEach((r) => {
+        if (!alumnosRiesgo[r.id_alumno]) {
+          alumnosRiesgo[r.id_alumno] = {
+            numero_control: r.numero_control,
+            nombre_completo: `${r.apellido_paterno} ${r.apellido_materno || ""} ${r.nombre}`,
+            materias_reprobadas_actuales: 0,
+            materias_recurse: [],
+            materias_especial: [],
+          };
+        }
+
+        // Contar reprobadas en este periodo
+        if (
+          r.estado_materia === "Reprobada" ||
+          (r.calificacion_final !== null && r.calificacion_final < 70)
+        ) {
+          alumnosRiesgo[r.id_alumno].materias_reprobadas_actuales++;
+        }
+
+        // Detectar Recurse (Intento 2) o Especial (Intento 3+)
+        if (r.num_intento == 2) {
+          alumnosRiesgo[r.id_alumno].materias_recurse.push(r.nombre_materia);
+        } else if (r.num_intento >= 3) {
+          alumnosRiesgo[r.id_alumno].materias_especial.push(r.nombre_materia);
+        }
+      });
+
+      // 3. FILTRO FINAL: Solo devolvemos a los que están en peligro real
+      const reporte = Object.values(alumnosRiesgo).filter(
+        (a) =>
+          a.materias_reprobadas_actuales >= 3 ||
+          a.materias_recurse.length > 0 ||
+          a.materias_especial.length > 0,
+      );
+
+      // Ordenamos alfabéticamente
+      reporte.sort((a, b) =>
+        a.nombre_completo.localeCompare(b.nombre_completo),
+      );
+      resolve(reporte);
+    });
   });
 });

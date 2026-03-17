@@ -415,6 +415,7 @@
         // ==========================================
         let chartEvolucion,
           chartEvPromedio,
+          chartCaptacion, // <-- NUEVA VARIABLE
           chartDemografia,
           chartModalidades,
           chartDesercion;
@@ -439,9 +440,33 @@
 
             if (chartEvolucion) chartEvolucion.destroy();
             if (chartEvPromedio) chartEvPromedio.destroy();
+            if (chartCaptacion) chartCaptacion.destroy(); // <-- DESTRUIR LA NUEVA
             if (chartDemografia) chartDemografia.destroy();
             if (chartModalidades) chartModalidades.destroy();
             if (chartDesercion) chartDesercion.destroy();
+
+            // ---> INYECCIÓN A.1: DIBUJAR GRÁFICA DE CAPTACIÓN <---
+            chartCaptacion = new Chart(
+              document.getElementById("chart-captacion-ingresos"),
+              {
+                type: "bar",
+                data: {
+                  labels: res.captacion.map((e) => e.periodo),
+                  datasets: [
+                    {
+                      label: "Nuevos Ingresos",
+                      data: res.captacion.map((e) => e.nuevos_ingresos),
+                      backgroundColor: "#20c997", // Verde azulado
+                      borderRadius: 4,
+                    },
+                  ],
+                },
+                options: {
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                },
+              },
+            );
 
             chartEvolucion = new Chart(
               document.getElementById("chart-evolucion-matricula"),
@@ -725,12 +750,138 @@
         });
 
         // ==========================================
+        // LAZY LOADING: ZONA COHORTE (GENERACIÓN)
+        // ==========================================
+        let chartEmbudo, chartMateriasFiltro;
+        const cohortePeriodo = document.getElementById("cohorte-periodo");
+        const btnAnalizarCohorte = document.getElementById(
+          "btn-analizar-cohorte",
+        );
+
+        // Cargar periodos en el combobox de cohorte
+        window.electronAPI.invoke("get-periodos").then((periodos) => {
+          cohortePeriodo.innerHTML =
+            '<option value="">Seleccione Generación...</option>';
+          periodos.forEach((p) => {
+            cohortePeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`;
+          });
+        });
+
+        btnAnalizarCohorte.addEventListener("click", async () => {
+          const id_periodo = cohortePeriodo.value;
+          if (!id_periodo) return;
+
+          const btnOriginal = btnAnalizarCohorte.innerHTML;
+          btnAnalizarCohorte.innerHTML =
+            '<span class="spinner-border spinner-border-sm"></span>';
+
+          try {
+            const res = await window.electronAPI.invoke(
+              "get-dashboard-cohorte",
+              id_periodo,
+            );
+
+            // KPI Promedio
+            document.getElementById("cohorte-promedio").textContent = res
+              .promedioGen.promedio
+              ? parseFloat(res.promedioGen.promedio).toFixed(1)
+              : "--";
+
+            // Procesar datos para el embudo
+            let ingresaron = 0,
+              activos = 0,
+              egresados = 0,
+              titulados = 0;
+            res.statusCounts.forEach((s) => {
+              ingresaron += s.total;
+              if (s.status === "Activo" || s.status === "Baja Temporal")
+                activos += s.total;
+              if (s.status === "Egresado") egresados += s.total;
+              if (s.status === "Titulado") titulados += s.total;
+            });
+            // Titulados también son egresados (sumamos al embudo lógico)
+            egresados += titulados;
+            activos += egresados; // Para que la barra de activos incluya a los que ya terminaron (los que no desertaron)
+
+            if (chartEmbudo) chartEmbudo.destroy();
+            if (chartMateriasFiltro) chartMateriasFiltro.destroy();
+
+            // Gráfica de Embudo (Simulada con Barras Horizontales)
+            chartEmbudo = new Chart(
+              document.getElementById("chart-cohorte-embudo"),
+              {
+                type: "bar",
+                data: {
+                  labels: [
+                    "1. Total Ingresos",
+                    "2. Retención (Activos+Egresados)",
+                    "3. Terminaron Materias",
+                    "4. Titulados",
+                  ],
+                  datasets: [
+                    {
+                      data: [ingresaron, activos, egresados, titulados],
+                      backgroundColor: [
+                        "#0dcaf0",
+                        "#3b82f6",
+                        "#8b5cf6",
+                        "#10b981",
+                      ],
+                      borderRadius: 4,
+                    },
+                  ],
+                },
+                options: {
+                  indexAxis: "y", // Barra horizontal (efecto embudo)
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                },
+              },
+            );
+
+            // Gráfica Materias Filtro
+            chartMateriasFiltro = new Chart(
+              document.getElementById("chart-cohorte-materias"),
+              {
+                type: "bar",
+                data: {
+                  labels:
+                    res.materiasFiltro.length > 0
+                      ? res.materiasFiltro.map((m) => m.nombre_materia)
+                      : ["Sin datos"],
+                  datasets: [
+                    {
+                      label: "Reprobadas históricas",
+                      data:
+                        res.materiasFiltro.length > 0
+                          ? res.materiasFiltro.map((m) => m.reprobados)
+                          : [0],
+                      backgroundColor: "#dc3545",
+                      borderRadius: 4,
+                    },
+                  ],
+                },
+                options: {
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                },
+              },
+            );
+          } catch (err) {
+            console.error(err);
+          }
+          btnAnalizarCohorte.innerHTML = btnOriginal;
+        });
+
+        // ==========================================
         // LAZY LOADING: ZONA 3 (MEGA EXPANSIÓN)
         // ==========================================
         let chartCompetencias,
           chartAcreditacion,
           chartMicroGauss,
-          chartMicroReg;
+          chartMicroReg,
+          chartMicroComparativa,
+          chartMicroHistorico;
         const microPeriodo = document.getElementById("dash-micro-periodo");
         const microMateria = document.getElementById("dash-micro-materia");
         const microGrupo = document.getElementById("dash-micro-grupo");
@@ -815,6 +966,8 @@
               if (chartAcreditacion) chartAcreditacion.destroy();
               if (chartMicroGauss) chartMicroGauss.destroy();
               if (chartMicroReg) chartMicroReg.destroy();
+              if (chartMicroComparativa) chartMicroComparativa.destroy();
+              if (chartMicroHistorico) chartMicroHistorico.destroy();
 
               // Gráfica: Competencias
               const compValues = [];
@@ -965,6 +1118,112 @@
                   options: {
                     maintainAspectRatio: false,
                     plugins: { legend: { position: "bottom" } },
+                  },
+                },
+              );
+
+              // ---> INYECCIÓN A.4: TERMÓMETRO DOCENTE (GRUPOS) <---
+              chartMicroComparativa = new Chart(
+                document.getElementById("chart-micro-comparativa"),
+                {
+                  type: "bar",
+                  data: {
+                    labels:
+                      res.comparativaGrupos.length > 0
+                        ? res.comparativaGrupos.map((g) => g.nombre_grupo)
+                        : ["Sin Grupos"],
+                    datasets: [
+                      {
+                        label: "% Reprobación",
+                        data:
+                          res.comparativaGrupos.length > 0
+                            ? res.comparativaGrupos.map((g) =>
+                                g.total_alumnos > 0
+                                  ? (g.reprobados / g.total_alumnos) * 100
+                                  : 0,
+                              )
+                            : [0],
+                        backgroundColor: "#fd7e14",
+                        borderRadius: 4,
+                      },
+                    ],
+                  },
+                  options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: function (ctx) {
+                            return ctx.raw.toFixed(1) + "% reprobación";
+                          },
+                        },
+                      },
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                          callback: function (value) {
+                            return value + "%";
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              );
+
+              // ---> INYECCIÓN A.5: HISTÓRICO DE DIFICULTAD <---
+              chartMicroHistorico = new Chart(
+                document.getElementById("chart-micro-historico"),
+                {
+                  type: "line",
+                  data: {
+                    labels:
+                      res.historicoMateria.length > 0
+                        ? res.historicoMateria.map((h) => h.periodo)
+                        : ["Sin Datos"],
+                    datasets: [
+                      {
+                        label: "% Reprobación Histórica",
+                        data:
+                          res.historicoMateria.length > 0
+                            ? res.historicoMateria.map(
+                                (h) => h.porcentaje_reprobacion || 0,
+                              )
+                            : [0],
+                        borderColor: "#dc3545",
+                        backgroundColor: "rgba(220, 53, 69, 0.2)",
+                        tension: 0.3,
+                        fill: true,
+                      },
+                    ],
+                  },
+                  options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: function (ctx) {
+                            return ctx.raw.toFixed(1) + "% reprobación";
+                          },
+                        },
+                      },
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                          callback: function (value) {
+                            return value + "%";
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               );
@@ -4068,6 +4327,106 @@
 
         // Inicializamos el motor de PDF
         const { jsPDF } = window.jspdf;
+
+        // ---> INYECCIÓN B.1: LÓGICA DE ALERTA TEMPRANA <---
+        const repAlertaPeriodo = document.getElementById("rep-alerta-periodo");
+        const btnExportAlerta = document.getElementById(
+          "btn-export-alerta-pdf",
+        );
+
+        // Cargar periodos
+        try {
+          const periodos = await window.electronAPI.invoke("get-periodos");
+          repAlertaPeriodo.innerHTML =
+            '<option value="">Seleccione Periodo...</option>';
+          periodos.forEach(
+            (p) =>
+              (repAlertaPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`),
+          );
+        } catch (e) {}
+
+        if (btnExportAlerta) {
+          btnExportAlerta.addEventListener("click", async () => {
+            const id_periodo = repAlertaPeriodo.value;
+            if (!id_periodo)
+              return window.electronAPI.invoke(
+                "dialog-alert",
+                "Selecciona un periodo.",
+              );
+
+            const textPer =
+              repAlertaPeriodo.options[repAlertaPeriodo.selectedIndex].text;
+            const originalBtn = btnExportAlerta.innerHTML;
+            btnExportAlerta.innerHTML =
+              '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+              const reporte = await window.electronAPI.invoke(
+                "get-alerta-temprana",
+                id_periodo,
+              );
+              if (reporte.length === 0) {
+                btnExportAlerta.innerHTML = originalBtn;
+                return window.electronAPI.invoke(
+                  "dialog-alert",
+                  "¡Felicidades! No se detectaron alumnos en riesgo para este periodo.",
+                );
+              }
+
+              const doc = new jsPDF("landscape"); // Horizontal porque tiene muchos datos
+
+              doc.setFontSize(16);
+              doc.text(
+                "SISTEMA DE ALERTA TEMPRANA Y PREVENCIÓN DE DESERCIÓN",
+                140,
+                15,
+                { align: "center" },
+              );
+              doc.setFontSize(10);
+              doc.text(`Periodo Evaluado: ${textPer}`, 14, 25);
+              doc.text(
+                `Alumnos en riesgo detectados: ${reporte.length}`,
+                14,
+                31,
+              );
+
+              const bodyData = reporte.map((a) => [
+                a.numero_control,
+                a.nombre_completo,
+                a.materias_reprobadas_actuales,
+                a.materias_recurse.length > 0
+                  ? a.materias_recurse.join(", ")
+                  : "-",
+                a.materias_especial.length > 0
+                  ? a.materias_especial.join(", ")
+                  : "-",
+              ]);
+
+              doc.autoTable({
+                startY: 38,
+                head: [
+                  [
+                    "No. Control",
+                    "Nombre del Alumno",
+                    "Reprobadas (Actuales)",
+                    "Materias en Recurse",
+                    "Materias en Especial",
+                  ],
+                ],
+                body: bodyData,
+                theme: "grid",
+                headStyles: { fillColor: [220, 53, 69] }, // Rojo Peligro
+                styles: { fontSize: 8 },
+              });
+
+              doc.save(`Alerta_Temprana_${textPer}.pdf`);
+            } catch (e) {
+              console.error(e);
+            }
+            btnExportAlerta.innerHTML = originalBtn;
+          });
+        }
+        // -----------------------------------------------------------
 
         // ---------------------------------------------------------
         // REPORTE 1: KÁRDEX OFICIAL (PDF)

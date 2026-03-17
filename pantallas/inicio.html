@@ -44,6 +44,18 @@
     <li class="nav-item" role="presentation">
       <button
         class="nav-link"
+        id="tab-cohorte"
+        data-bs-toggle="pill"
+        data-bs-target="#panel-cohorte"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-funnel-fill me-2"></i>Eficiencia por Generación
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
         id="tab-micro"
         data-bs-toggle="pill"
         data-bs-target="#panel-micro"
@@ -182,6 +194,31 @@
             </div>
             <div class="card-body position-relative" style="height: 280px">
               <canvas id="chart-evolucion-promedio"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-12">
+          <div
+            class="card border-0 shadow-sm h-100 border-start border-4 border-success"
+          >
+            <div
+              class="card-header border-0 bg-transparent pt-3 d-flex justify-content-between align-items-center"
+            >
+              <h6 class="mb-0 fw-bold text-success">
+                <i class="bi bi-graph-up-arrow me-2"></i>Captación de Nuevos
+                Ingresos
+                <i
+                  class="bi bi-question-circle text-muted ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Cantidad de alumnos de nuevo ingreso inscritos oficialmente por cada generación."
+                ></i>
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="height: 250px">
+              <canvas id="chart-captacion-ingresos"></canvas>
             </div>
           </div>
         </div>
@@ -432,6 +469,72 @@
       </div>
     </div>
 
+    <div class="tab-pane fade h-100" id="panel-cohorte" role="tabpanel">
+      <div class="d-flex flex-column h-100 pe-2">
+        <div class="card shadow-sm border-0 mb-3 bg-dark flex-shrink-0">
+          <div class="card-body py-3 d-flex align-items-end gap-3">
+            <div style="width: 250px">
+              <label class="form-label text-muted small mb-1"
+                >Selecciona la Generación de Ingreso:</label
+              >
+              <select
+                id="cohorte-periodo"
+                class="form-select form-select-sm border-info"
+              ></select>
+            </div>
+            <button
+              class="btn btn-info btn-sm text-dark fw-bold px-4"
+              id="btn-analizar-cohorte"
+            >
+              <i class="bi bi-magic me-2"></i>Analizar Cohorte
+            </button>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <div class="card bg-primary bg-opacity-10 border-0 h-100">
+              <div class="card-body text-center">
+                <h6 class="text-primary fw-bold">Promedio Generacional</h6>
+                <h2 class="mb-0 text-white" id="cohorte-promedio">--</h2>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 flex-grow-1" style="min-height: 300px">
+          <div class="col-md-6">
+            <div class="card bg-dark border-0 shadow-sm h-100">
+              <div class="card-header border-0 bg-transparent pt-3 pb-0">
+                <h6 class="text-white fw-bold">
+                  <i class="bi bi-funnel-fill text-info me-2"></i>Embudo de
+                  Eficiencia Terminal
+                </h6>
+              </div>
+              <div class="card-body position-relative">
+                <canvas id="chart-cohorte-embudo"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div
+              class="card bg-dark border-0 shadow-sm h-100 border-start border-4 border-danger"
+            >
+              <div class="card-header border-0 bg-transparent pt-3 pb-0">
+                <h6 class="text-danger fw-bold">
+                  <i class="bi bi-exclamation-triangle-fill me-2"></i>Materias
+                  "Filtro" (Más Reprobadas)
+                </h6>
+              </div>
+              <div class="card-body position-relative">
+                <canvas id="chart-cohorte-materias"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-pane fade pb-4" id="panel-micro" role="tabpanel">
       <div
         class="card bg-dark border-0 shadow-sm mb-3 position-sticky top-0"
@@ -617,6 +720,51 @@
                 class="list-group list-group-flush"
                 id="list-micro-bottom"
               ></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-md-6">
+          <div
+            class="card bg-dark border-0 shadow-sm h-100 border-start border-4 border-warning"
+          >
+            <div
+              class="card-header border-0 bg-transparent pt-3 pb-0 d-flex justify-content-between align-items-center"
+            >
+              <h6 class="text-warning fw-bold mb-0">
+                <i class="bi bi-bar-chart-steps me-2"></i>Termómetro Docente
+                <i
+                  class="bi bi-question-circle text-muted ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Compara el porcentaje de reprobación entre todos los grupos de esta materia en el periodo seleccionado para detectar anomalías."
+                ></i>
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="height: 250px">
+              <canvas id="chart-micro-comparativa"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div
+            class="card bg-dark border-0 shadow-sm h-100 border-start border-4 border-danger"
+          >
+            <div
+              class="card-header border-0 bg-transparent pt-3 pb-0 d-flex justify-content-between align-items-center"
+            >
+              <h6 class="text-danger fw-bold mb-0">
+                <i class="bi bi-graph-down-arrow me-2"></i>Dificultad Histórica
+                <i
+                  class="bi bi-question-circle text-muted ms-1"
+                  data-bs-toggle="tooltip"
+                  title="Muestra cómo ha evolucionado la tasa de reprobación de esta materia a lo largo de todos los semestres."
+                ></i>
+              </h6>
+            </div>
+            <div class="card-body position-relative" style="height: 250px">
+              <canvas id="chart-micro-historico"></canvas>
             </div>
           </div>
         </div>
