@@ -1782,6 +1782,65 @@
             }
           });
         }
+
+        // ---> INYECCIÓN C.1: LÓGICA DE RESPALDOS <---
+        const btnExportarBD = document.getElementById("btn-exportar-bd");
+        const btnImportarBD = document.getElementById("btn-importar-bd");
+
+        if (btnExportarBD) {
+          btnExportarBD.addEventListener("click", async () => {
+            const originalText = btnExportarBD.innerHTML;
+            btnExportarBD.innerHTML =
+              '<span class="spinner-border spinner-border-sm"></span> Encriptando...';
+            try {
+              const res = await window.electronAPI.invoke("exportar-respaldo");
+              if (res.success) {
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  `¡Respaldo blindado creado exitosamente en:\n${res.path}`,
+                );
+              } else if (res.error) {
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "Error al crear respaldo: " + res.error,
+                );
+              }
+            } catch (err) {
+              console.error(err);
+            }
+            btnExportarBD.innerHTML = originalText;
+          });
+        }
+
+        if (btnImportarBD) {
+          btnImportarBD.addEventListener("click", async () => {
+            const confirmar = await window.electronAPI.invoke(
+              "dialog-confirm",
+              "¡ATENCIÓN! Restaurar un respaldo eliminará todos los datos actuales de esta computadora y la aplicación se reiniciará.\n\n¿Estás completamente seguro de continuar?",
+            );
+            if (!confirmar) return;
+
+            const originalText = btnImportarBD.innerHTML;
+            btnImportarBD.innerHTML =
+              '<span class="spinner-border spinner-border-sm"></span> Restaurando...';
+            try {
+              const res = await window.electronAPI.invoke("importar-respaldo");
+              if (res.error) {
+                await window.electronAPI.invoke(
+                  "dialog-alert",
+                  "Error al restaurar (Posible contraseña incorrecta o archivo dañado): " +
+                    res.error,
+                );
+                btnImportarBD.innerHTML = originalText;
+              }
+              // Si es exitoso, la app se reinicia sola y nunca llega a esta línea.
+            } catch (err) {
+              console.error(err);
+              btnImportarBD.innerHTML = originalText;
+            }
+          });
+        }
+        // ---------------------------------------------
       }
 
       // ==========================================

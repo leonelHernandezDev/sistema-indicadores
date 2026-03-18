@@ -3,6 +3,16 @@ const { app, BrowserWindow, ipcMain, dialog } = require("electron"); // <-- Agre
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcryptjs");
+const fs = require("fs");
+const crypto = require("crypto");
+
+// Llave maestra indestructible (AES-256 requiere 32 bytes)
+const ENCRYPTION_KEY = crypto.scryptSync(
+  "Sistema_TecNM_Blindado_2026",
+  "salto_seguro",
+  32,
+);
+const IV_LENGTH = 16;
 
 // --- Configuración de la Base de Datos ---
 // Definimos la ruta de la base de datos en la carpeta de datos del usuario
@@ -1764,4 +1774,69 @@ ipcMain.handle("get-boletas-grupo", async (event, datos) => {
       },
     );
   });
+});
+
+// ==========================================
+//    MÓDULO DE SEGURIDAD Y RESPALDOS (AES-256)
+// ==========================================
+
+ipcMain.handle("exportar-respaldo", async (event) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Guardar Respaldo Encriptado",
+      defaultPath: "Respaldo_TecNM.bak",
+      filters: [{ name: "Archivo de Respaldo Seguro", extensions: ["bak"] }],
+    });
+
+    if (canceled || !filePath) return { success: false };
+
+    // Encriptación AES-256
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
+
+    const input = fs.readFileSync(dbPath);
+    const encrypted = Buffer.concat([iv, cipher.update(input), cipher.final()]);
+
+    fs.writeFileSync(filePath, encrypted);
+    return { success: true, path: filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("importar-respaldo", async (event) => {
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: "Restaurar Respaldo",
+      filters: [{ name: "Archivo de Respaldo Seguro", extensions: ["bak"] }],
+      properties: ["openFile"],
+    });
+
+    if (canceled || filePaths.length === 0) return { success: false };
+
+    const filePath = filePaths[0];
+    const encryptedData = fs.readFileSync(filePath);
+
+    // Desencriptación
+    const iv = encryptedData.slice(0, IV_LENGTH);
+    const encryptedText = encryptedData.slice(IV_LENGTH);
+    const decipher = crypto.createDecipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
+
+    const decrypted = Buffer.concat([
+      decipher.update(encryptedText),
+      decipher.final(),
+    ]);
+
+    // Cerramos la base de datos temporalmente para poder sobreescribirla
+    await new Promise((resolve) => db.close(resolve));
+
+    fs.writeFileSync(dbPath, decrypted);
+
+    // Reiniciamos la aplicación violentamente para cargar los nuevos datos
+    app.relaunch();
+    app.exit(0);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
