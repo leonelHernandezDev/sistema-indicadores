@@ -300,53 +300,125 @@
       <div class="sidebar">
         <div class="logo-container">
           <div class="sidebar-text">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 40" width="150" height="40">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 150 40"
+              width="150"
+              height="40"
+            >
               <defs>
-                <linearGradient id="gradLogo" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#4361ee;stop-opacity:1" />
-                  <stop offset="100%" style="stop-color:#0dcaf0;stop-opacity:1" />
+                <linearGradient
+                  id="gradLogo"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop
+                    offset="0%"
+                    style="stop-color: #4361ee; stop-opacity: 1"
+                  />
+                  <stop
+                    offset="100%"
+                    style="stop-color: #0dcaf0; stop-opacity: 1"
+                  />
                 </linearGradient>
               </defs>
               <rect width="30" height="30" rx="8" y="5" fill="url(#gradLogo)" />
-              <path d="M10 15 L20 10 L30 15 L20 20 Z" fill="#ffffff" opacity="0.9" />
-              <path d="M10 20 L20 25 L30 20" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.6" />
-              <text x="40" y="28" font-family="'Segoe UI', sans-serif" font-weight="800" font-size="20" fill="#ffffff" letter-spacing="1">ACAD<span fill="#4361ee">X</span></text>
+              <path
+                d="M10 15 L20 10 L30 15 L20 20 Z"
+                fill="#ffffff"
+                opacity="0.9"
+              />
+              <path
+                d="M10 20 L20 25 L30 20"
+                fill="none"
+                stroke="#ffffff"
+                stroke-width="2"
+                opacity="0.6"
+              />
+              <text
+                x="40"
+                y="28"
+                font-family="'Segoe UI', sans-serif"
+                font-weight="800"
+                font-size="20"
+                fill="#ffffff"
+                letter-spacing="1"
+              >
+                ACAD
+                <span fill="#4361ee">X</span>
+              </text>
             </svg>
           </div>
-          <button id="btn-toggle-sidebar" class="btn btn-link text-muted p-0 shadow-none border-0">
+          <button
+            id="btn-toggle-sidebar"
+            class="btn btn-link text-muted p-0 shadow-none border-0"
+          >
             <i class="bi bi-list fs-3"></i>
           </button>
         </div>
 
         <ul class="nav nav-pills flex-column mb-auto" id="main-nav">
           <li class="nav-item">
-            <a href="#" class="nav-link active" id="nav-inicio" data-page="inicio">
-              <i class="bi bi-house-door-fill me-2"></i> <span class="sidebar-text">Inicio</span>
+            <a
+              href="#"
+              class="nav-link active"
+              id="nav-inicio"
+              data-page="inicio"
+            >
+              <i class="bi bi-house-door-fill me-2"></i>
+              <span class="sidebar-text">Inicio</span>
             </a>
           </li>
           <li class="nav-item">
-            <a href="#" class="nav-link" id="nav-alumnos" data-page="gestion-alumnos">
-              <i class="bi bi-person-fill me-2"></i> <span class="sidebar-text">Alumnos</span>
+            <a
+              href="#"
+              class="nav-link"
+              id="nav-alumnos"
+              data-page="gestion-alumnos"
+            >
+              <i class="bi bi-person-fill me-2"></i>
+              <span class="sidebar-text">Alumnos</span>
             </a>
           </li>
           <li class="nav-item">
-            <a href="#" class="nav-link" id="nav-academico" data-page="academico">
-              <i class="bi bi-journal-bookmark-fill me-2"></i> <span class="sidebar-text">Académico</span>
+            <a
+              href="#"
+              class="nav-link"
+              id="nav-academico"
+              data-page="academico"
+            >
+              <i class="bi bi-journal-bookmark-fill me-2"></i>
+              <span class="sidebar-text">Académico</span>
             </a>
           </li>
           <li class="nav-item">
-            <a href="#" class="nav-link" id="nav-titulacion" data-page="titulacion">
-              <i class="bi bi-mortarboard-fill me-2"></i> <span class="sidebar-text">Titulación</span>
+            <a
+              href="#"
+              class="nav-link"
+              id="nav-titulacion"
+              data-page="titulacion"
+            >
+              <i class="bi bi-mortarboard-fill me-2"></i>
+              <span class="sidebar-text">Titulación</span>
             </a>
           </li>
           <li class="nav-item">
             <a href="#" class="nav-link" id="nav-reportes" data-page="reportes">
-              <i class="bi bi-bar-chart-fill me-2"></i> <span class="sidebar-text">Reportes</span>
+              <i class="bi bi-bar-chart-fill me-2"></i>
+              <span class="sidebar-text">Reportes</span>
             </a>
           </li>
           <li class="nav-item">
-            <a href="#" class="nav-link" id="nav-config" data-page="config-periodos">
-              <i class="bi bi-gear-fill me-2"></i> <span class="sidebar-text">Configuración</span>
+            <a
+              href="#"
+              class="nav-link"
+              id="nav-config"
+              data-page="config-periodos"
+            >
+              <i class="bi bi-gear-fill me-2"></i>
+              <span class="sidebar-text">Configuración</span>
             </a>
           </li>
         </ul>
@@ -4794,6 +4866,191 @@
             doc.save(`Sabana_${matNombre}_Grupo${grpNombre}.pdf`);
           });
 
+        // ---> INYECCIÓN B.2: LÓGICA DE BOLETAS MASIVAS <---
+        const repBolPeriodo = document.getElementById("rep-bol-periodo");
+        const repBolMateria = document.getElementById("rep-bol-materia");
+        const repBolGrupo = document.getElementById("rep-bol-grupo");
+        const btnExportBoletas = document.getElementById(
+          "btn-export-boletas-pdf",
+        );
+
+        // Cargar periodos al inicio
+        window.electronAPI.invoke("get-periodos").then((periodos) => {
+          repBolPeriodo.innerHTML =
+            '<option value="">Seleccione Periodo...</option>';
+          periodos.forEach(
+            (p) =>
+              (repBolPeriodo.innerHTML += `<option value="${p.id_periodo}">${p.nombre}</option>`),
+          );
+        });
+
+        // Cascada: Periodo -> Materia
+        repBolPeriodo.addEventListener("change", async (e) => {
+          repBolMateria.innerHTML = '<option value="">Cargando...</option>';
+          repBolGrupo.innerHTML = '<option value="">Grupo...</option>';
+          repBolMateria.disabled = true;
+          repBolGrupo.disabled = true;
+          if (!e.target.value) return;
+          try {
+            // CORRECCIÓN: Las materias son globales, usamos get-materias
+            const materias = await window.electronAPI.invoke("get-materias");
+            repBolMateria.innerHTML =
+              '<option value="">Seleccione Materia...</option>';
+            materias.forEach(
+              (m) =>
+                (repBolMateria.innerHTML += `<option value="${m.id_materia}">${m.nombre_materia}</option>`),
+            );
+            repBolMateria.disabled = false;
+          } catch (err) {
+            console.error(err);
+          }
+        });
+
+        // Cascada: Materia -> Grupo
+        repBolMateria.addEventListener("change", async (e) => {
+          repBolGrupo.innerHTML = '<option value="">Cargando...</option>';
+          repBolGrupo.disabled = true;
+          if (!e.target.value) return;
+          try {
+            const grupos = await window.electronAPI.invoke(
+              "get-grupos-por-periodo",
+              repBolPeriodo.value,
+            );
+            repBolGrupo.innerHTML =
+              '<option value="">Seleccione Grupo...</option>';
+            grupos.forEach(
+              (g) =>
+                (repBolGrupo.innerHTML += `<option value="${g.id_grupo}">${g.nombre_grupo}</option>`),
+            );
+            repBolGrupo.disabled = false;
+          } catch (err) {
+            console.error(err);
+          }
+        });
+
+        // Generar el PDF
+        if (btnExportBoletas) {
+          btnExportBoletas.addEventListener("click", async () => {
+            if (
+              !repBolPeriodo.value ||
+              !repBolMateria.value ||
+              !repBolGrupo.value
+            ) {
+              return window.electronAPI.invoke(
+                "dialog-alert",
+                "Selecciona Periodo, Materia y Grupo.",
+              );
+            }
+
+            const originalBtn = btnExportBoletas.innerHTML;
+            btnExportBoletas.innerHTML =
+              '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+              // Empacamos los 3 datos en un solo objeto para que preload.js no los deje caer
+              const boletas = await window.electronAPI.invoke(
+                "get-boletas-grupo",
+                {
+                  id_periodo: repBolPeriodo.value,
+                  id_materia: repBolMateria.value,
+                  id_grupo: repBolGrupo.value,
+                },
+              );
+
+              if (boletas.length === 0) {
+                btnExportBoletas.innerHTML = originalBtn;
+                return window.electronAPI.invoke(
+                  "dialog-alert",
+                  "No hay alumnos inscritos en este grupo.",
+                );
+              }
+
+              const doc = new jsPDF("portrait");
+              const matName = boletas[0].nombre_materia;
+              const perName = boletas[0].nombre_periodo;
+              const grpName = boletas[0].nombre_grupo;
+
+              // Bucle para crear una página por alumno
+              boletas.forEach((al, index) => {
+                if (index > 0) doc.addPage(); // Nueva página a partir del segundo alumno
+
+                // Encabezado
+                doc.setFontSize(16);
+                doc.setFont("helvetica", "bold");
+                doc.text("BOLETA DE CALIFICACIONES PARCIALES", 105, 20, {
+                  align: "center",
+                });
+
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "normal");
+                doc.text(`Periodo Escolar: ${perName}`, 14, 35);
+                doc.text(`Asignatura: ${matName}`, 14, 42);
+                doc.text(`Grupo: ${grpName}`, 14, 49);
+
+                // Datos del alumno
+                doc.setFont("helvetica", "bold");
+                doc.text("Datos del Estudiante:", 14, 60);
+                doc.setFont("helvetica", "normal");
+                doc.text(`No. Control: ${al.numero_control}`, 14, 67);
+                doc.text(
+                  `Nombre: ${al.apellido_paterno} ${al.apellido_materno || ""} ${al.nombre}`,
+                  14,
+                  74,
+                );
+
+                // Extraer competencias activas (las que no sean null)
+                const competencias = [];
+                for (let i = 1; i <= 10; i++) {
+                  if (
+                    al[`c${i}`] !== null &&
+                    al[`c${i}`] !== undefined &&
+                    al[`c${i}`] !== ""
+                  ) {
+                    competencias.push(
+                      `C${i}: ${al[`c${i}`] === 0 ? "NA" : al[`c${i}`]}`,
+                    );
+                  }
+                }
+
+                // Si la materia es histórica y no tiene competencias, ponemos un aviso
+                const textoCompetencias =
+                  competencias.length > 0
+                    ? competencias.join("   |   ")
+                    : "Sin desglose de competencias registrado.";
+
+                // Caja de Calificaciones
+                doc.setDrawColor(0);
+                doc.setFillColor(245, 245, 245);
+                doc.rect(14, 85, 182, 35, "FD"); // Fondo gris claro
+
+                doc.setFont("helvetica", "bold");
+                doc.text("DESGLOSE DE UNIDADES:", 18, 93);
+                doc.setFont("helvetica", "normal");
+                doc.text(textoCompetencias, 18, 103);
+
+                doc.setFont("helvetica", "bold");
+                doc.text(
+                  `PROMEDIO FINAL: ${al.calificacion_final === 0 ? "NA" : al.calificacion_final}   (${al.estado_materia})`,
+                  18,
+                  113,
+                );
+
+                // Firmas
+                doc.line(40, 200, 90, 200);
+                doc.text("Firma del Docente", 65, 205, { align: "center" });
+
+                doc.line(120, 200, 170, 200);
+                doc.text("Firma del Alumno", 145, 205, { align: "center" });
+              });
+
+              doc.save(`Lote_Boletas_${grpName}_${perName}.pdf`);
+            } catch (err) {
+              console.error(err);
+            }
+            btnExportBoletas.innerHTML = originalBtn;
+          });
+        }
+
         // ---------------------------------------------------------
         // REPORTE 3: PADRÓN DE TITULADOS (Excel Maestro)
         // ---------------------------------------------------------
@@ -4838,9 +5095,11 @@
 
     <script>
       // Lógica de Toggle de la Barra Lateral
-      document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
-        document.querySelector('.sidebar').classList.toggle('collapsed');
-      });
+      document
+        .getElementById("btn-toggle-sidebar")
+        .addEventListener("click", () => {
+          document.querySelector(".sidebar").classList.toggle("collapsed");
+        });
     </script>
   </body>
 </html>

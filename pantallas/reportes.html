@@ -167,13 +167,62 @@
       </div>
     </div>
 
-    <div class="col-md-12">
+    <div class="col-md-6">
       <div
-        class="card bg-dark border-0 shadow-sm border-top border-4 border-warning"
+        class="card bg-dark border-0 shadow-sm h-100 border-top border-4 border-info"
       >
-        <div
-          class="card-body p-4 d-flex justify-content-between align-items-center"
-        >
+        <div class="card-body p-4 d-flex flex-column">
+          <h5 class="fw-bold text-white mb-3">
+            <i class="bi bi-file-earmark-person me-2 text-info"></i>Boletas de
+            Calificaciones
+          </h5>
+          <p class="text-muted small mb-3">
+            Genera un PDF paginado con las boletas individuales de todos los
+            alumnos de un grupo, desglosando sus competencias (C1-C10).
+          </p>
+          <div class="row g-2 mt-auto">
+            <div class="col-12">
+              <select
+                id="rep-bol-periodo"
+                class="form-select form-select-sm bg-black text-white border-secondary"
+              ></select>
+            </div>
+            <div class="col-6">
+              <select
+                id="rep-bol-materia"
+                class="form-select form-select-sm bg-black text-white border-secondary"
+                disabled
+              >
+                <option value="">Materia...</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <select
+                id="rep-bol-grupo"
+                class="form-select form-select-sm bg-black text-white border-secondary"
+                disabled
+              >
+                <option value="">Grupo...</option>
+              </select>
+            </div>
+            <div class="col-12 mt-3">
+              <button
+                class="btn btn-info w-100 shadow-sm fw-bold"
+                id="btn-export-boletas-pdf"
+              >
+                <i class="bi bi-printer-fill me-2"></i>Generar Lote de Boletas
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div
+        class="card bg-dark border-0 shadow-sm h-100 border-top border-4 border-warning"
+      >
+        <div class="card-body p-4 d-flex flex-column justify-content-center">
           <div>
             <h5 class="fw-bold text-white mb-2">
               <i class="bi bi-mortarboard-fill me-2 text-warning"></i>Padrón

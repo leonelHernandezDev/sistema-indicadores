@@ -464,7 +464,8 @@ ipcMain.handle("delete-alumno", async (event, id_alumno) => {
           "DELETE FROM Titulados WHERE id_alumno_fk = ?",
           [id_alumno],
           (err2) => {
-            if (err2) console.error("Error al borrar acta de titulación:", err2);
+            if (err2)
+              console.error("Error al borrar acta de titulación:", err2);
 
             // 3. Ahora sí, con el camino libre, borramos al alumno
             db.run(
@@ -475,14 +476,16 @@ ipcMain.handle("delete-alumno", async (event, id_alumno) => {
                   console.error("Error al eliminar alumno:", err3.message);
                   reject(err3);
                 } else {
-                  console.log(`Alumno ${id_alumno} y todo su rastro eliminado.`);
+                  console.log(
+                    `Alumno ${id_alumno} y todo su rastro eliminado.`,
+                  );
                   resolve({ success: true });
                 }
-              }
+              },
             );
-          }
+          },
         );
-      }
+      },
     );
   });
 });
@@ -1732,5 +1735,33 @@ ipcMain.handle("get-alerta-temprana", async (event, id_periodo) => {
       );
       resolve(reporte);
     });
+  });
+});
+
+// ---> INYECCIÓN B.2: EXTRACCIÓN PARA BOLETAS MASIVAS (CORREGIDO) <---
+ipcMain.handle("get-boletas-grupo", async (event, datos) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT a.numero_control, a.nombre, a.apellido_paterno, a.apellido_materno,
+             i.c1, i.c2, i.c3, i.c4, i.c5, i.c6, i.c7, i.c8, i.c9, i.c10,
+             i.calificacion_final, i.estado_materia, i.tipo_acreditacion,
+             m.nombre_materia, g.nombre_grupo, p.nombre as nombre_periodo
+      FROM Inscripciones i
+      JOIN Alumnos a ON i.id_alumno_fk = a.id_alumno
+      JOIN Materias m ON i.id_materia_fk = m.id_materia
+      JOIN Grupos g ON i.id_grupo_fk = g.id_grupo
+      JOIN PeriodosEscolares p ON i.id_periodo_fk = p.id_periodo
+      WHERE i.id_periodo_fk = ? AND i.id_materia_fk = ? AND i.id_grupo_fk = ?
+      ORDER BY a.apellido_paterno, a.apellido_materno, a.nombre ASC
+    `;
+    // Extraemos los datos del paquete que nos manda el frontend
+    db.all(
+      sql,
+      [datos.id_periodo, datos.id_materia, datos.id_grupo],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      },
+    );
   });
 });
