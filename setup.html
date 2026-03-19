@@ -57,25 +57,23 @@
           />
           <label for="username">Crear nombre de usuario</label>
         </div>
-        <div class="form-floating mb-3">
-          <input
-            type="password"
-            class="form-control"
-            id="password"
-            placeholder="Contraseña"
-            required
-          />
-          <label for="password">Crear contraseña</label>
+        <div class="input-group mb-3">
+          <div class="form-floating flex-grow-1">
+            <input type="password" class="form-control" id="password" placeholder="Contraseña" required>
+            <label for="password">Crear contraseña</label>
+          </div>
+          <button class="btn btn-outline-secondary border-secondary" type="button" id="btn-toggle-pass1">
+            <i class="bi bi-eye-slash-fill" id="icono-pass1"></i>
+          </button>
         </div>
-        <div class="form-floating mb-3">
-          <input
-            type="password"
-            class="form-control"
-            id="confirm-password"
-            placeholder="Confirmar"
-            required
-          />
-          <label for="confirm-password">Confirmar contraseña</label>
+        <div class="input-group mb-3">
+          <div class="form-floating flex-grow-1">
+            <input type="password" class="form-control" id="confirm-password" placeholder="Confirmar" required>
+            <label for="confirm-password">Confirmar contraseña</label>
+          </div>
+          <button class="btn btn-outline-secondary border-secondary" type="button" id="btn-toggle-pass2">
+            <i class="bi bi-eye-slash-fill" id="icono-pass2"></i>
+          </button>
         </div>
 
         <button class="w-100 btn btn-lg btn-primary" type="submit">
@@ -124,6 +122,30 @@
       errorMessage.textContent = message;
       errorMessage.classList.remove('d-none');
     });
+
+    // ---> Lógica para mostrar/ocultar ambas contraseñas <---
+    const togglePass = (btnId, inputId, iconId) => {
+      const btn = document.getElementById(btnId);
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById(iconId);
+
+      if (btn) {
+        btn.addEventListener("click", () => {
+          if (input.type === "password") {
+            input.type = "text";
+            icon.classList.remove("bi-eye-slash-fill");
+            icon.classList.add("bi-eye-fill", "text-info");
+          } else {
+            input.type = "password";
+            icon.classList.remove("bi-eye-fill", "text-info");
+            icon.classList.add("bi-eye-slash-fill");
+          }
+        });
+      }
+    };
+
+    togglePass("btn-toggle-pass1", "password", "icono-pass1");
+    togglePass("btn-toggle-pass2", "confirm-password", "icono-pass2");
   </script>
 </body>
 </html>

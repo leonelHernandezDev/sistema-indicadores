@@ -55,15 +55,14 @@
           />
           <label for="username">Nombre de usuario</label>
         </div>
-        <div class="form-floating mb-3">
-          <input
-            type="password"
-            class="form-control"
-            id="password"
-            placeholder="Contraseña"
-            required
-          />
-          <label for="password">Contraseña</label>
+        <div class="input-group mb-3">
+          <div class="form-floating flex-grow-1">
+            <input type="password" class="form-control" id="password" placeholder="Contraseña" required>
+            <label for="password">Contraseña</label>
+          </div>
+          <button class="btn btn-outline-secondary" type="button" id="btn-toggle-pass">
+            <i class="bi bi-eye-slash-fill" id="icono-pass"></i>
+          </button>
         </div>
 
         <button class="w-100 btn btn-lg btn-primary" type="submit">
@@ -102,6 +101,25 @@
         errorMessage.classList.remove('d-none'); // Hacemos visible el mensaje
       }
     });
+
+    // ---> Lógica para mostrar/ocultar contraseña <---
+    const btnToggle = document.getElementById("btn-toggle-pass");
+    const passInput = document.getElementById("password");
+    const iconoPass = document.getElementById("icono-pass");
+
+    if (btnToggle) {
+      btnToggle.addEventListener("click", () => {
+        if (passInput.type === "password") {
+          passInput.type = "text";
+          iconoPass.classList.remove("bi-eye-slash-fill");
+          iconoPass.classList.add("bi-eye-fill", "text-info");
+        } else {
+          passInput.type = "password";
+          iconoPass.classList.remove("bi-eye-fill", "text-info");
+          iconoPass.classList.add("bi-eye-slash-fill");
+        }
+      });
+    }
   </script>
 </body>
 </html>

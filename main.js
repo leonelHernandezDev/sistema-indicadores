@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow, ipcMain, dialog } = require("electron"); // <-- Agregamos 'dialog'
+const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron"); // <-- Agregamos 'dialog'
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcryptjs");
@@ -29,19 +29,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
     });
   }
 });
-
-// ==========================================================
-// SCRIPT DE EXPANSIÓN A 10 COMPETENCIAS
-// ==========================================================
-db.serialize(() => {
-  db.run("ALTER TABLE Inscripciones ADD COLUMN c9 REAL", (err) => {
-    if (!err) console.log("Columna C9 agregada con éxito.");
-  });
-  db.run("ALTER TABLE Inscripciones ADD COLUMN c10 REAL", (err) => {
-    if (!err) console.log("Columna C10 agregada con éxito.");
-  });
-});
-// ==========================================================
 
 /* ==========================================================
 // SCRIPT TEMPORAL DE LIMPIEZA DE DATOS (EXORCISMO)
@@ -77,94 +64,106 @@ let mainWindow;
 
 /**
  * Función para ejecutar la creación de todas las tablas
- * "IF NOT EXISTS" asegura que solo se creen la primera vez.
+ * Convertida en Promesa para evitar el error del primer arranque.
  */
 function setupDatabase() {
-  db.serialize(() => {
-    // 1. Tabla Usuarios
-    db.run(`CREATE TABLE IF NOT EXISTS Usuarios (
-      id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL
-    )`);
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      // 1. Tabla Usuarios
+      db.run(`CREATE TABLE IF NOT EXISTS Usuarios (
+        id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL
+      )`);
 
-    // 2. Tabla Alumnos (Con RESTRICT en el Periodo de Ingreso)
-    db.run(`CREATE TABLE IF NOT EXISTS Alumnos (
-      id_alumno INTEGER PRIMARY KEY AUTOINCREMENT,
-      numero_control TEXT UNIQUE NOT NULL,
-      nombre TEXT NOT NULL,
-      apellido_paterno TEXT NOT NULL,
-      apellido_materno TEXT,
-      genero TEXT,
-      fecha_nacimiento TEXT,
-      status TEXT,
-      id_periodo_ingreso_fk INTEGER,
-      FOREIGN KEY (id_periodo_ingreso_fk) REFERENCES PeriodosEscolares(id_periodo) ON DELETE RESTRICT
-    )`);
+      // 2. Tabla Alumnos
+      db.run(`CREATE TABLE IF NOT EXISTS Alumnos (
+        id_alumno INTEGER PRIMARY KEY AUTOINCREMENT,
+        numero_control TEXT UNIQUE NOT NULL,
+        nombre TEXT NOT NULL,
+        apellido_paterno TEXT NOT NULL,
+        apellido_materno TEXT,
+        genero TEXT,
+        fecha_nacimiento TEXT,
+        status TEXT,
+        id_periodo_ingreso_fk INTEGER,
+        FOREIGN KEY (id_periodo_ingreso_fk) REFERENCES PeriodosEscolares(id_periodo) ON DELETE RESTRICT
+      )`);
 
-    // 3. Tabla PeriodosEscolares
-    db.run(`CREATE TABLE IF NOT EXISTS PeriodosEscolares (
-      id_periodo INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT UNIQUE NOT NULL
-    )`);
+      // 3. Tabla PeriodosEscolares
+      db.run(`CREATE TABLE IF NOT EXISTS PeriodosEscolares (
+        id_periodo INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT UNIQUE NOT NULL
+      )`);
 
-    // 3.5. Tabla Grupos (Con RESTRICT al Periodo)
-    db.run(`CREATE TABLE IF NOT EXISTS Grupos (
-      id_grupo INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre_grupo TEXT NOT NULL,
-      id_periodo_fk INTEGER NOT NULL,
-      FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo) ON DELETE RESTRICT
-    )`);
+      // 3.5. Tabla Grupos
+      db.run(`CREATE TABLE IF NOT EXISTS Grupos (
+        id_grupo INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre_grupo TEXT NOT NULL,
+        id_periodo_fk INTEGER NOT NULL,
+        FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo) ON DELETE RESTRICT
+      )`);
 
-    // 4. Tabla Materias
-    db.run(`CREATE TABLE IF NOT EXISTS Materias (
-      id_materia INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre_materia TEXT NOT NULL,
-      semestre_ideal INTEGER,
-      creditos INTEGER DEFAULT 0
-    )`);
+      // 4. Tabla Materias
+      db.run(`CREATE TABLE IF NOT EXISTS Materias (
+        id_materia INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre_materia TEXT NOT NULL,
+        semestre_ideal INTEGER,
+        creditos INTEGER DEFAULT 0
+      )`);
 
-    // 5. Tabla Titulados (Con RESTRICT al Alumno)
-    db.run(`CREATE TABLE IF NOT EXISTS Titulados (
-      id_titulacion INTEGER PRIMARY KEY AUTOINCREMENT,
-      id_alumno_fk INTEGER NOT NULL,
-      fecha_titulacion TEXT NOT NULL,
-      modalidad TEXT NOT NULL,
-      folio_acta TEXT,
-      promedio REAL,
-      mencion_honorifica INTEGER,
-      FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno) ON DELETE RESTRICT
-    )`);
+      // 5. Tabla Titulados
+      db.run(`CREATE TABLE IF NOT EXISTS Titulados (
+        id_titulacion INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_alumno_fk INTEGER NOT NULL,
+        fecha_titulacion TEXT NOT NULL,
+        modalidad TEXT NOT NULL,
+        folio_acta TEXT,
+        promedio REAL,
+        mencion_honorifica INTEGER,
+        FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno) ON DELETE RESTRICT
+      )`);
 
-    // 6. Tabla Inscripciones (¡NUEVO MODELO TECNM!)
-    db.run(`CREATE TABLE IF NOT EXISTS Inscripciones (
-      id_inscripcion INTEGER PRIMARY KEY AUTOINCREMENT,
-      id_alumno_fk INTEGER NOT NULL,
-      id_materia_fk INTEGER NOT NULL,
-      id_periodo_fk INTEGER NOT NULL,
-      id_grupo_fk INTEGER NOT NULL,
-      
-      -- Sistema de Competencias Dinámico
-      c1 REAL, c2 REAL, c3 REAL, c4 REAL,
-      c5 REAL, c6 REAL, c7 REAL, c8 REAL,
-      calificacion_final REAL, 
-      
-      -- Reglas Universitarias
-      estado_materia TEXT DEFAULT 'Cursando', 
-      tipo_acreditacion TEXT DEFAULT 'CN', -- CN, SO, CI
-      
-      -- Auditoría
-      fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
-      fecha_modificacion DATETIME DEFAULT CURRENT_TIMESTAMP,
-      
-      -- Blindaje Restrictivo
-      FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno) ON DELETE RESTRICT,
-      FOREIGN KEY (id_materia_fk) REFERENCES Materias(id_materia) ON DELETE RESTRICT,
-      FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo) ON DELETE RESTRICT,
-      FOREIGN KEY (id_grupo_fk) REFERENCES Grupos(id_grupo) ON DELETE RESTRICT
-    )`);
+      // 6. Tabla Inscripciones (La última tabla resuelve la promesa)
+      db.run(
+        `CREATE TABLE IF NOT EXISTS Inscripciones (
+        id_inscripcion INTEGER PRIMARY KEY AUTOINCREMENT,
+        id_alumno_fk INTEGER NOT NULL,
+        id_materia_fk INTEGER NOT NULL,
+        id_periodo_fk INTEGER NOT NULL,
+        id_grupo_fk INTEGER NOT NULL,
+        c1 REAL, c2 REAL, c3 REAL, c4 REAL,
+        c5 REAL, c6 REAL, c7 REAL, c8 REAL, c9 REAL, c10 REAL, 
+        calificacion_final REAL, 
+        estado_materia TEXT DEFAULT 'Cursando', 
+        tipo_acreditacion TEXT DEFAULT 'CN',
+        fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+        fecha_modificacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno) ON DELETE RESTRICT,
+        FOREIGN KEY (id_materia_fk) REFERENCES Materias(id_materia) ON DELETE RESTRICT,
+        FOREIGN KEY (id_periodo_fk) REFERENCES PeriodosEscolares(id_periodo) ON DELETE RESTRICT,
+        FOREIGN KEY (id_grupo_fk) REFERENCES Grupos(id_grupo) ON DELETE RESTRICT
+      )`,
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            // ---> INYECCIÓN: MOTORES DE BÚSQUEDA ULTRARRÁPIDA (ÍNDICES) <---
+            db.run(
+              `CREATE INDEX IF NOT EXISTS idx_insc_alumno_materia ON Inscripciones(id_alumno_fk, id_materia_fk)`,
+            );
+            db.run(
+              `CREATE INDEX IF NOT EXISTS idx_insc_periodo ON Inscripciones(id_periodo_fk)`,
+            );
 
-    console.log("Base de datos y tablas aseguradas con arquitectura TecNM.");
+            console.log(
+              "Base de datos e Índices de Alta Velocidad asegurados.",
+            );
+            resolve(); // <--- ¡Avisamos que ya terminó!
+          }
+        },
+      );
+    });
   });
 }
 
@@ -180,10 +179,20 @@ function createMainWindow() {
     },
   });
 
-  mainWindow.loadFile("index.html"); // Carga la app principal
-  // ¡AGREGA ESTA LÍNEA PARA ABRIR LA CONSOLA AUTOMÁTICAMENTE!
-  //mainWindow.webContents.openDevTools();
-  mainWindow.setMenu(null); // Quita el menú
+  // ---> INYECCIÓN: BLOQUEO DE ATAJOS DE TECLADO <---
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    // Bloquear F5, Ctrl+R (Recargar) y F12 (Herramientas de desarrollador)
+    if (
+      input.key === "F5" ||
+      (input.control && input.key.toLowerCase() === "r") ||
+      input.key === "F12"
+    ) {
+      event.preventDefault();
+    }
+  });
+
+  mainWindow.loadFile("index.html");
+  mainWindow.setMenu(null);
 }
 
 /**
@@ -208,31 +217,32 @@ function createAuthWindow(file, width, height) {
 }
 
 // --- Lógica de Arranque de la App ---
-app.whenReady().then(() => {
-  // 1. Aseguramos que la BD y las tablas existan
-  setupDatabase();
+app.whenReady().then(async () => {
+  try {
+    // 1. Esperamos PACIENTEMENTE a que la BD y las tablas existan
+    await setupDatabase();
 
-  // 2. Revisamos si hay usuarios
-  db.get("SELECT COUNT(*) as count FROM Usuarios", (err, row) => {
-    if (err) {
-      console.error(err.message);
-      return;
-    }
+    // 2. Ahora sí, revisamos si hay usuarios
+    db.get("SELECT COUNT(*) as count FROM Usuarios", (err, row) => {
+      if (err) {
+        console.error(err.message);
+        return;
+      }
 
-    // 3. Decidimos qué pantalla mostrar
-    if (row.count === 0) {
-      // No hay usuarios, mostrar pantalla de configuración
-      createAuthWindow("setup.html", 500, 650);
-    } else {
-      // Hay usuarios, mostrar pantalla de login
-      createAuthWindow("login.html", 500, 550);
-    }
-  });
+      // 3. Decidimos qué pantalla mostrar
+      if (row.count === 0) {
+        createAuthWindow("setup.html", 500, 650);
+      } else {
+        createAuthWindow("login.html", 500, 550);
+      }
+    });
+  } catch (error) {
+    console.error("Error fatal al inicializar la base de datos:", error);
+  }
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      // Esto es para macOS, pero es buena práctica tenerlo
-      // Deberíamos re-ejecutar la lógica de chequeo de usuario
+      // Re-ejecutar si es macOS
     }
   });
 });
@@ -1835,6 +1845,31 @@ ipcMain.handle("importar-respaldo", async (event) => {
     // Reiniciamos la aplicación violentamente para cargar los nuevos datos
     app.relaunch();
     app.exit(0);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// ==========================================
+//    MÓDULO DE AYUDA Y SOPORTE
+// ==========================================
+ipcMain.handle("abrir-manual", async () => {
+  try {
+    // Asumimos que pondrás un archivo llamado "Manual_Usuario.pdf" en la misma carpeta que main.js
+    const manualPath = path.join(__dirname, "Manual_Usuario.pdf");
+
+    // shell.openPath abre el archivo con el lector de PDF predeterminado de Windows
+    const result = await shell.openPath(manualPath);
+
+    if (result) {
+      // Si result contiene texto, es un mensaje de error de Windows
+      return {
+        success: false,
+        error:
+          "No se encontró el archivo Manual_Usuario.pdf en la carpeta del sistema.",
+      };
+    }
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };

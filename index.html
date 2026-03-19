@@ -421,6 +421,17 @@
               <span class="sidebar-text">Configuración</span>
             </a>
           </li>
+
+          <li class="nav-item mt-4">
+            <a
+              href="#"
+              class="nav-link text-info fw-bold"
+              id="btn-abrir-manual"
+            >
+              <i class="bi bi-question-circle-fill me-2"></i>
+              <span class="sidebar-text">Ayuda / Manual</span>
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -481,8 +492,20 @@
         }
       }
 
-      function handleNavClick(e) {
+      async function handleNavClick(e) {
         e.preventDefault();
+
+        // ---> INYECCIÓN: GUARDIÁN GLOBAL DE LA SÁBANA <---
+        if (window.cambiosSinGuardarSabana) {
+          const confirmar = await window.electronAPI.invoke(
+            "dialog-confirm",
+            "⚠️ Tienes calificaciones capturadas sin guardar.\n\nSi sales de este módulo, perderás el progreso actual de la Sábana. ¿Deseas salir y PERDER los cambios?",
+          );
+          if (!confirmar) return; // Si dice que NO, se cancela la salida
+          window.cambiosSinGuardarSabana = false; // Si dice que SÍ, se le permite salir
+        }
+        // --------------------------------------------------
+
         navLinks.forEach((link) => link.classList.remove("active"));
         const clickedLink = e.currentTarget;
         clickedLink.classList.add("active");
@@ -4079,13 +4102,22 @@
         // PILAR 7: ÁNGEL DE LA GUARDA (Unsaved Changes)
         // ==========================================
         const tabGrupal = document.getElementById("grupal-tab");
+        let validandoPestana = false; // Candado anti-doble modal
+
         tabGrupal.addEventListener("hide.bs.tab", async (e) => {
           if (window.cambiosSinGuardarSabana) {
             e.preventDefault(); // Detenemos el cambio de pestaña
+
+            if (validandoPestana) return; // Si ya está preguntando, lo bloqueamos
+            validandoPestana = true;
+
             const confirmar = await window.electronAPI.invoke(
               "dialog-confirm",
               "⚠️ Tienes calificaciones capturadas sin guardar.\n\nSi cambias de pestaña, perderás este progreso. ¿Deseas salir y PERDER los cambios?",
             );
+
+            validandoPestana = false; // Liberamos el candado
+
             if (confirmar) {
               window.cambiosSinGuardarSabana = false;
               // Forzamos el cambio a la pestaña que quería ir
@@ -5159,6 +5191,37 @@
         .addEventListener("click", () => {
           document.querySelector(".sidebar").classList.toggle("collapsed");
         });
+
+      // ---> LÓGICA DEL BOTÓN DE AYUDA <---
+      const btnManual = document.getElementById("btn-abrir-manual");
+      if (btnManual) {
+        btnManual.addEventListener("click", async (e) => {
+          e.preventDefault();
+          const originalHTML = btnManual.innerHTML;
+          // Cambiamos el contenido temporalmente para dar feedback visual
+          btnManual.innerHTML =
+            '<i class="bi bi-hourglass-split me-2"></i><span class="sidebar-text">Abriendo...</span>';
+
+          try {
+            const res = await window.electronAPI.invoke("abrir-manual");
+            if (!res.success) {
+              await window.electronAPI.invoke(
+                "dialog-alert",
+                "Error al abrir el manual:\n" +
+                  res.error +
+                  "\n\nAsegúrate de que el archivo 'Manual_Usuario.pdf' esté en la misma carpeta que el programa.",
+              );
+            }
+          } catch (err) {
+            console.error("Error IPC:", err);
+          }
+
+          // Restauramos el botón después de 1 segundo
+          setTimeout(() => {
+            btnManual.innerHTML = originalHTML;
+          }, 1000);
+        });
+      }
     </script>
   </body>
 </html>
