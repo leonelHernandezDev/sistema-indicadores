@@ -711,7 +711,7 @@ ipcMain.handle("delete-grupo", async (event, id_grupo) => {
 ipcMain.handle("dialog-confirm", async (event, pregunta) => {
   const result = await dialog.showMessageBox(mainWindow, {
     type: "question",
-    buttons: ["Cancelar", "Sí, Eliminar"], // El botón 0 es Cancelar, el 1 es Sí
+    buttons: ["Cancelar", "Sí, confirmar"], // El botón 0 es Cancelar, el 1 es Sí
     defaultId: 0, // La opción por defecto es Cancelar (seguridad)
     title: "Confirmación requerida",
     message: pregunta,
@@ -1948,7 +1948,7 @@ ipcMain.handle("importar-respaldo", async (event) => {
 ipcMain.handle("abrir-manual", async () => {
   try {
     // Asumimos que pondrás un archivo llamado "Manual_Usuario.pdf" en la misma carpeta que main.js
-    const manualPath = path.join(__dirname, "Manual_Usuario.pdf");
+    const manualPath = path.join(process.resourcesPath, "Manual_Usuario.pdf");
 
     // shell.openPath abre el archivo con el lector de PDF predeterminado de Windows
     const result = await shell.openPath(manualPath);
