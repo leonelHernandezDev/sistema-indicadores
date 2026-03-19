@@ -1786,6 +1786,97 @@ ipcMain.handle("get-boletas-grupo", async (event, datos) => {
   });
 });
 
+// ---> INYECCIÓN B.3: REPORTE DE NUEVO INGRESO <---
+ipcMain.handle("get-reporte-nuevo-ingreso", async (event, id_periodo) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT a.numero_control, a.nombre, a.apellido_paterno, a.apellido_materno, a.genero, a.status
+      FROM Alumnos a
+      WHERE a.id_periodo_ingreso_fk = ?
+      ORDER BY a.apellido_paterno, a.apellido_materno, a.nombre
+    `;
+    db.all(sql, [id_periodo], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
+// ---> INYECCIÓN B.4: REPORTE HISTÓRICO DE DESERCIÓN (BAJAS) <---
+ipcMain.handle("get-reporte-bajas", async (event, data) => {
+  return new Promise((resolve, reject) => {
+    const { id_desde, id_hasta } = data;
+    const sql = `
+      SELECT * FROM (
+          SELECT a.numero_control, a.nombre, a.apellido_paterno, a.apellido_materno, a.status,
+                 (SELECT p.nombre 
+                  FROM Inscripciones i 
+                  JOIN PeriodosEscolares p ON i.id_periodo_fk = p.id_periodo 
+                  WHERE i.id_alumno_fk = a.id_alumno 
+                  ORDER BY p.id_periodo DESC LIMIT 1) as ultimo_periodo,
+                 (SELECT i.id_periodo_fk 
+                  FROM Inscripciones i 
+                  WHERE i.id_alumno_fk = a.id_alumno 
+                  ORDER BY i.id_periodo_fk DESC LIMIT 1) as id_ultimo_periodo
+          FROM Alumnos a
+          WHERE a.status IN ('Baja Temporal', 'Baja Definitiva', 'Desertor', 'Baja')
+      )
+      WHERE id_ultimo_periodo >= ? AND id_ultimo_periodo <= ?
+      ORDER BY id_ultimo_periodo DESC, apellido_paterno, apellido_materno, nombre
+    `;
+    db.all(sql, [id_desde, id_hasta], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
+// ---> INYECCIÓN B.5: REPORTE MATERIAS FILTRO (ÍNDICE REPROBACIÓN) <---
+ipcMain.handle("get-reporte-materias-filtro", async (event, id_periodo) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT m.nombre_materia,
+             COUNT(i.id_inscripcion) as total_cursando,
+             SUM(CASE WHEN i.calificacion_final < 70 OR i.calificacion_final IS NULL THEN 1 ELSE 0 END) as total_reprobados,
+             ROUND(CAST(SUM(CASE WHEN i.calificacion_final < 70 OR i.calificacion_final IS NULL THEN 1 ELSE 0 END) AS FLOAT) / COUNT(i.id_inscripcion) * 100, 1) as indice_reprobacion
+      FROM Inscripciones i
+      JOIN Materias m ON i.id_materia_fk = m.id_materia
+      WHERE i.id_periodo_fk = ?
+      GROUP BY m.id_materia
+      ORDER BY indice_reprobacion DESC
+    `;
+    db.all(sql, [id_periodo], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
+// ---> INYECCIÓN B.6: CUELLOS DE BOTELLA POR COMPETENCIA <---
+ipcMain.handle("get-reporte-cuellos-botella", async (event, id_periodo) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      SELECT m.nombre_materia, g.nombre_grupo,
+             COUNT(i.id_inscripcion) as total_alumnos,
+             SUM(CASE WHEN i.c1 < 70 THEN 1 ELSE 0 END) as rep_c1,
+             SUM(CASE WHEN i.c2 < 70 THEN 1 ELSE 0 END) as rep_c2,
+             SUM(CASE WHEN i.c3 < 70 THEN 1 ELSE 0 END) as rep_c3,
+             SUM(CASE WHEN i.c4 < 70 THEN 1 ELSE 0 END) as rep_c4,
+             SUM(CASE WHEN i.c5 < 70 THEN 1 ELSE 0 END) as rep_c5,
+             SUM(CASE WHEN i.c6 < 70 THEN 1 ELSE 0 END) as rep_c6
+      FROM Inscripciones i
+      JOIN Materias m ON i.id_materia_fk = m.id_materia
+      JOIN Grupos g ON i.id_grupo_fk = g.id_grupo
+      WHERE i.id_periodo_fk = ? AND i.c1 IS NOT NULL
+      GROUP BY m.id_materia, g.id_grupo
+    `;
+    db.all(sql, [id_periodo], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+});
+
 // ==========================================
 //    MÓDULO DE SEGURIDAD Y RESPALDOS (AES-256)
 // ==========================================

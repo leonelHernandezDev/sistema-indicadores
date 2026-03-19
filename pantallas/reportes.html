@@ -59,7 +59,6 @@
             Genera un PDF formal con el historial académico completo de un
             estudiante específico, incluyendo promedios y estatus por materia.
           </p>
-
           <div class="position-relative mb-auto">
             <label class="form-label small text-muted">Buscar Alumno:</label>
             <input
@@ -74,15 +73,16 @@
               style="z-index: 1000; max-height: 200px; overflow-y: auto"
             ></div>
           </div>
-
           <div
             id="rep-kardex-selected"
             class="alert bg-primary bg-opacity-10 border border-primary text-white mt-3 d-none"
           >
             <div class="d-flex justify-content-between align-items-center">
               <div>
-                <strong class="d-block" id="rep-kardex-nombre">--</strong>
-                <small class="font-monospace text-muted" id="rep-kardex-control"
+                <strong class="d-block" id="rep-kardex-nombre">--</strong
+                ><small
+                  class="font-monospace text-muted"
+                  id="rep-kardex-control"
                   >--</small
                 >
               </div>
@@ -94,7 +94,6 @@
               </button>
             </div>
           </div>
-
           <button
             class="btn btn-primary w-100 mt-4 shadow-sm"
             id="btn-export-kardex-pdf"
@@ -120,7 +119,6 @@
             Exporta la lista de calificaciones finales y parciales de un grupo
             específico en un periodo escolar.
           </p>
-
           <div class="mb-2">
             <label class="form-label small text-muted mb-1">Periodo:</label>
             <select
@@ -148,7 +146,6 @@
               <option value="">Todos los grupos</option>
             </select>
           </div>
-
           <div class="d-flex gap-2 mt-4">
             <button
               class="btn btn-outline-success w-50 shadow-sm"
@@ -234,12 +231,154 @@
             </p>
           </div>
           <button
-            class="btn btn-warning shadow-sm fw-bold px-4 py-2"
+            class="btn btn-warning shadow-sm fw-bold px-4 py-2 mt-4"
             id="btn-export-titulados-excel"
           >
             <i class="bi bi-file-earmark-spreadsheet-fill me-2 text-dark"></i
             >Generar Excel Maestro
           </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div
+        class="card bg-dark border-0 shadow-sm h-100 border-top border-4 border-info"
+      >
+        <div class="card-body p-4 d-flex flex-column justify-content-center">
+          <h5 class="fw-bold text-white mb-2">
+            <i class="bi bi-person-plus-fill me-2 text-info"></i>Alumnos de
+            Nuevo Ingreso
+          </h5>
+          <p class="text-muted small mb-4">
+            Genera un reporte PDF con la lista oficial de alumnos matriculados
+            en un periodo específico de ingreso.
+          </p>
+          <div class="mt-auto">
+            <label class="form-label text-muted small mb-1"
+              >Generación (Periodo de Ingreso):</label
+            >
+            <select
+              id="rep-nuevo-ingreso-periodo"
+              class="form-select bg-black text-white border-secondary mb-3"
+            ></select>
+            <button
+              class="btn btn-info w-100 shadow-sm fw-bold"
+              id="btn-export-nuevo-ingreso-pdf"
+            >
+              <i class="bi bi-file-earmark-pdf-fill me-2"></i>Generar Reporte
+              PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div
+        class="card bg-dark border-0 shadow-sm h-100 border-top border-4 border-secondary"
+      >
+        <div class="card-body p-4 d-flex flex-column justify-content-center">
+          <h5 class="fw-bold text-white mb-2">
+            <i class="bi bi-person-dash-fill me-2 text-secondary"></i>Reporte de
+            Deserción (Bajas)
+          </h5>
+          <p class="text-muted small mb-4">
+            Lista de alumnos que causaron Baja (Definitiva o Temporal) filtrada
+            por el rango de su último periodo cursado.
+          </p>
+          <div class="row g-2 mt-auto mb-3">
+            <div class="col-6">
+              <label class="form-label text-muted small mb-1"
+                >Desde Periodo:</label
+              >
+              <select
+                id="rep-bajas-desde"
+                class="form-select bg-black text-white border-secondary"
+              ></select>
+            </div>
+            <div class="col-6">
+              <label class="form-label text-muted small mb-1"
+                >Hasta Periodo:</label
+              >
+              <select
+                id="rep-bajas-hasta"
+                class="form-select bg-black text-white border-secondary"
+              ></select>
+            </div>
+          </div>
+          <button
+            class="btn btn-secondary w-100 shadow-sm fw-bold text-white"
+            id="btn-export-bajas-pdf"
+          >
+            <i class="bi bi-file-earmark-pdf-fill me-2"></i>Generar Reporte PDF
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div
+        class="card bg-dark border-0 shadow-sm h-100 border-top border-4 border-danger"
+      >
+        <div class="card-body p-4 d-flex flex-column justify-content-center">
+          <h5 class="fw-bold text-white mb-2">
+            <i class="bi bi-funnel-fill me-2 text-danger"></i>Materias Filtro
+            (Índice de Reprobación)
+          </h5>
+          <p class="text-muted small mb-4">
+            Identifica qué materias están causando el mayor índice de
+            reprobación en el periodo seleccionado.
+          </p>
+          <div class="mt-auto">
+            <label class="form-label text-muted small mb-1"
+              >Periodo a Evaluar:</label
+            >
+            <select
+              id="rep-materias-filtro-periodo"
+              class="form-select bg-black text-white border-secondary mb-3"
+            ></select>
+            <button
+              class="btn btn-danger w-100 shadow-sm fw-bold"
+              id="btn-export-materias-filtro-pdf"
+            >
+              <i class="bi bi-file-earmark-pdf-fill me-2"></i>Generar Análisis
+              PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div
+        class="card bg-dark border-0 shadow-sm h-100 border-top border-4 border-warning"
+      >
+        <div class="card-body p-4 d-flex flex-column justify-content-center">
+          <h5 class="fw-bold text-white mb-2">
+            <i class="bi bi-search me-2 text-warning"></i>Cuellos de Botella
+            (Micro-Analítica)
+          </h5>
+          <p class="text-muted small mb-4">
+            Detecta qué Unidad/Competencia específica (C1 a C6) es la que más
+            reprueba cada grupo.
+          </p>
+          <div class="mt-auto">
+            <label class="form-label text-muted small mb-1"
+              >Periodo a Evaluar:</label
+            >
+            <select
+              id="rep-cuellos-botella-periodo"
+              class="form-select bg-black text-white border-secondary mb-3"
+            ></select>
+            <button
+              class="btn btn-warning shadow-sm fw-bold"
+              id="btn-export-cuellos-botella-pdf"
+            >
+              <i class="bi bi-file-earmark-pdf-fill me-2"></i>Generar Analítica
+              PDF
+            </button>
+          </div>
         </div>
       </div>
     </div>
