@@ -1737,6 +1737,13 @@
                 });
               }
 
+              // ---> INYECCIÓN: ATRAPAMOS EL MENSAJE DEL BACKEND Y LANZAMOS LA ALERTA <---
+              if (!res.success) {
+                await window.electronAPI.invoke("dialog-alert", res.error);
+                return; // Detenemos el proceso aquí para que no limpie el formulario
+              }
+              // -------------------------------------------------------------------------
+
               if (res.success) {
                 inputNombreGrupo.value = "";
                 idGrupoAEditar = null;
@@ -1860,6 +1867,86 @@
             } catch (err) {
               console.error(err);
               btnImportarBD.innerHTML = originalText;
+            }
+          });
+        }
+
+        // ---> INYECCIÓN C.2: LÓGICA DE MODALIDADES DE TITULACIÓN <---
+        const inputNuevaModalidad = document.getElementById(
+          "input-nueva-modalidad",
+        );
+        const btnAddModalidad = document.getElementById("btn-add-modalidad");
+        const listaModalidadesConfig = document.getElementById(
+          "lista-modalidades-config",
+        );
+
+        const listarModalidades = async () => {
+          if (!listaModalidadesConfig) return;
+          listaModalidadesConfig.innerHTML =
+            '<div class="text-center text-muted p-3"><span class="spinner-border spinner-border-sm"></span></div>';
+          try {
+            const modalidades =
+              await window.electronAPI.invoke("get-modalidades");
+            listaModalidadesConfig.innerHTML = "";
+            if (modalidades.length === 0) {
+              listaModalidadesConfig.innerHTML =
+                '<div class="text-center text-muted p-3">Sin modalidades</div>';
+              return;
+            }
+            modalidades.forEach((m) => {
+              listaModalidadesConfig.innerHTML += `
+                <div class="list-group-item bg-black text-white border-secondary d-flex justify-content-between align-items-center py-2">
+                  <span class="small">${m.nombre_modalidad}</span>
+                  <button class="btn btn-sm btn-outline-danger border-0 btn-borrar-modalidad" data-id="${m.id_modalidad}" data-nombre="${m.nombre_modalidad}">
+                    <i class="bi bi-trash-fill"></i>
+                  </button>
+                </div>
+              `;
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        if (listaModalidadesConfig) await listarModalidades();
+
+        if (btnAddModalidad && inputNuevaModalidad) {
+          btnAddModalidad.addEventListener("click", async () => {
+            const nombre = inputNuevaModalidad.value.trim();
+            if (!nombre)
+              return window.electronAPI.invoke(
+                "dialog-alert",
+                "Escribe el nombre de la modalidad.",
+              );
+
+            const res = await window.electronAPI.invoke(
+              "add-modalidad",
+              nombre,
+            );
+            if (!res.success) {
+              await window.electronAPI.invoke("dialog-alert", res.error);
+            } else {
+              inputNuevaModalidad.value = "";
+              await listarModalidades();
+            }
+          });
+        }
+
+        if (listaModalidadesConfig) {
+          listaModalidadesConfig.addEventListener("click", async (e) => {
+            const btnBorrar = e.target.closest(".btn-borrar-modalidad");
+            if (!btnBorrar) return;
+
+            const confirmado = await window.electronAPI.invoke(
+              "dialog-confirm",
+              `¿Eliminar la modalidad "${btnBorrar.dataset.nombre}"?`,
+            );
+            if (confirmado) {
+              await window.electronAPI.invoke(
+                "delete-modalidad",
+                btnBorrar.dataset.id,
+              );
+              await listarModalidades();
             }
           });
         }
@@ -4298,6 +4385,25 @@
         const instructionMsg = document.getElementById("tit-instruction");
         const tableBody = document.getElementById("titulados-table-body");
         const lblTotal = document.getElementById("total-titulados");
+        const selectModalidad = document.getElementById("tit-modalidad");
+
+        // ---> NUEVA FUNCIÓN PARA LLENAR EL SELECT DINÁMICAMENTE <---
+        const cargarModalidadesSelect = async () => {
+          if (!selectModalidad) return;
+          try {
+            const modalidades =
+              await window.electronAPI.invoke("get-modalidades");
+            selectModalidad.innerHTML =
+              '<option value="" selected disabled>Seleccione...</option>';
+            modalidades.forEach((m) => {
+              selectModalidad.innerHTML += `<option value="${m.nombre_modalidad}">${m.nombre_modalidad}</option>`;
+            });
+          } catch (e) {
+            console.error("Error al cargar modalidades:", e);
+          }
+        };
+        await cargarModalidadesSelect();
+        // ------------------------------------------------------------
 
         const cargarTitulados = async () => {
           tableBody.innerHTML =

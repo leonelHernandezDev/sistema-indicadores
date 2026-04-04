@@ -54,6 +54,18 @@
         <i class="bi bi-shield-lock-fill me-2"></i>Seguridad y Respaldos
       </button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="titulacion-config-tab"
+        data-bs-toggle="pill"
+        data-bs-target="#panel-titulacion-config"
+        type="button"
+        role="tab"
+      >
+        <i class="bi bi-mortarboard-fill me-2"></i>Titulación
+      </button>
+    </li>
   </ul>
 
   <div class="tab-content panel-fill" id="configTabsContent">
@@ -311,6 +323,59 @@
               >
                 <i class="bi bi-upload me-2"></i>Cargar Respaldo
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="tab-pane fade h-100"
+      id="panel-titulacion-config"
+      role="tabpanel"
+    >
+      <div class="row g-4 h-100 align-items-center justify-content-center pb-5">
+        <div class="col-md-6">
+          <div
+            class="card bg-dark border-0 shadow h-100 border-top border-4 border-warning"
+          >
+            <div class="card-body p-5 d-flex flex-column">
+              <div class="text-center mb-4">
+                <i
+                  class="bi bi-mortarboard-fill text-warning"
+                  style="font-size: 3.5rem"
+                ></i>
+                <h4 class="fw-bold text-white mt-3">Catálogo de Titulación</h4>
+                <p class="text-muted small">
+                  Agrega o elimina modalidades de titulación para el sistema.
+                </p>
+              </div>
+
+              <div class="input-group mb-4">
+                <input
+                  type="text"
+                  id="input-nueva-modalidad"
+                  class="form-control form-control-lg bg-black text-white border-secondary"
+                  placeholder="Ej. Proyecto Integrador..."
+                />
+                <button
+                  class="btn btn-warning fw-bold px-4"
+                  id="btn-add-modalidad"
+                >
+                  <i class="bi bi-plus-lg text-dark"></i>
+                </button>
+              </div>
+
+              <div
+                class="list-group flex-grow-1 overflow-auto border border-secondary rounded"
+                id="lista-modalidades-config"
+                style="max-height: 250px"
+              >
+                <div class="text-center text-muted p-4">
+                  <span class="spinner-border spinner-border-sm me-2"></span
+                  >Cargando...
+                </div>
+              </div>
             </div>
           </div>
         </div>

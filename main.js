@@ -124,6 +124,22 @@ function setupDatabase() {
         FOREIGN KEY (id_alumno_fk) REFERENCES Alumnos(id_alumno) ON DELETE RESTRICT
       )`);
 
+      // 5.5 Tabla CatalogoModalidades
+      db.run(
+        `CREATE TABLE IF NOT EXISTS CatalogoModalidades (
+        id_modalidad INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre_modalidad TEXT UNIQUE NOT NULL
+      )`,
+        (err) => {
+          if (!err) {
+            // Inyectamos las 3 opciones clásicas por defecto para que no empiecen en blanco
+            db.run(
+              `INSERT OR IGNORE INTO CatalogoModalidades (nombre_modalidad) VALUES ('Tesis'), ('CENEVAL'), ('Titulación por Seminario')`,
+            );
+          }
+        },
+      );
+
       // 6. Tabla Inscripciones (La última tabla resuelve la promesa)
       db.run(
         `CREATE TABLE IF NOT EXISTS Inscripciones (
@@ -640,11 +656,30 @@ ipcMain.handle("delete-periodo", async (event, id) => {
 ipcMain.handle("add-grupo", async (event, data) => {
   return new Promise((resolve, reject) => {
     const { nombre_grupo, id_periodo } = data;
-    const sql =
-      "INSERT INTO Grupos (nombre_grupo, id_periodo_fk) VALUES (?, ?)";
-    db.run(sql, [nombre_grupo, id_periodo], function (err) {
-      if (err) reject(err);
-      else resolve({ success: true, id: this.lastID });
+
+    // 1. EL CADENERO: Verificamos si el grupo ya existe EN ESTE MISMO PERIODO
+    // Usamos LOWER para que "311-M" y "311-m" sean tratados como duplicados
+    const sqlCheck =
+      "SELECT id_grupo FROM Grupos WHERE LOWER(nombre_grupo) = LOWER(?) AND id_periodo_fk = ?";
+
+    db.get(sqlCheck, [nombre_grupo, id_periodo], (err, row) => {
+      if (err) return reject(err);
+
+      if (row) {
+        // Bloqueamos la creación y le mandamos el mensaje al frontend
+        return resolve({
+          success: false,
+          error: `El grupo "${nombre_grupo}" ya se encuentra registrado en este periodo escolar.`,
+        });
+      }
+
+      // 2. Si tiene luz verde, procedemos con el guardado normal
+      const sqlInsert =
+        "INSERT INTO Grupos (nombre_grupo, id_periodo_fk) VALUES (?, ?)";
+      db.run(sqlInsert, [nombre_grupo, id_periodo], function (errInsert) {
+        if (errInsert) reject(errInsert);
+        else resolve({ success: true, id: this.lastID });
+      });
     });
   });
 });
@@ -1342,6 +1377,49 @@ ipcMain.handle("delete-titulacion", async (event, id_titulacion) => {
             },
           );
         });
+      },
+    );
+  });
+});
+
+ipcMain.handle("get-modalidades", async (event) => {
+  return new Promise((resolve, reject) => {
+    db.all(
+      "SELECT * FROM CatalogoModalidades ORDER BY nombre_modalidad ASC",
+      [],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      },
+    );
+  });
+});
+
+ipcMain.handle("add-modalidad", async (event, nombre) => {
+  return new Promise((resolve, reject) => {
+    db.run(
+      "INSERT INTO CatalogoModalidades (nombre_modalidad) VALUES (?)",
+      [nombre],
+      function (err) {
+        if (err) {
+          if (err.message.includes("UNIQUE"))
+            resolve({ success: false, error: "Esta modalidad ya existe." });
+          else reject(err);
+        } else resolve({ success: true, id: this.lastID });
+      },
+    );
+  });
+});
+
+ipcMain.handle("delete-modalidad", async (event, id) => {
+  return new Promise((resolve, reject) => {
+    // Aquí NO hay peligro de borrar el historial porque las actas guardan el texto, no el ID.
+    db.run(
+      "DELETE FROM CatalogoModalidades WHERE id_modalidad = ?",
+      [id],
+      function (err) {
+        if (err) reject(err);
+        else resolve({ success: true });
       },
     );
   });
