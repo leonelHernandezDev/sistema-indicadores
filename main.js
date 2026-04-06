@@ -494,7 +494,6 @@ ipcMain.handle("delete-alumno", async (event, id_alumno) => {
       [id_alumno],
       (err) => {
         if (err) console.error("Error al borrar inscripciones:", err);
-
         // 2. NUEVO PASO: Borramos su acta de titulación (Si es que la tiene)
         db.run(
           "DELETE FROM Titulados WHERE id_alumno_fk = ?",
@@ -502,7 +501,6 @@ ipcMain.handle("delete-alumno", async (event, id_alumno) => {
           (err2) => {
             if (err2)
               console.error("Error al borrar acta de titulación:", err2);
-
             // 3. Ahora sí, con el camino libre, borramos al alumno
             db.run(
               "DELETE FROM Alumnos WHERE id_alumno = ?",
@@ -984,32 +982,27 @@ ipcMain.handle("save-calificaciones-masivas", async (event, payload) => {
           db.run("ROLLBACK");
           return reject(err);
         }
-
         // Mapeamos los IDs existentes y los que vienen de la pantalla
         const existentes = rows.map((r) => r.id_inscripcion);
         const entrantes = alumnos
           .filter((a) => a.id_inscripcion)
           .map((a) => parseInt(a.id_inscripcion));
-
         // 2. MAGIA DE BORRADO: Si estaba en BD pero ya no está en pantalla, lo borramos (La "X" del UI)
         const aBorrar = existentes.filter((id) => !entrantes.includes(id));
         aBorrar.forEach((id) => {
           db.run("DELETE FROM Inscripciones WHERE id_inscripcion=?", [id]);
         });
-
         // 3. Preparamos las sentencias de Insertar y Actualizar
         const stmtInsert = db.prepare(`
           INSERT INTO Inscripciones 
           (id_alumno_fk, id_materia_fk, id_periodo_fk, id_grupo_fk, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, calificacion_final, estado_materia, tipo_acreditacion) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
-
         const stmtUpdate = db.prepare(`
           UPDATE Inscripciones SET 
           c1=?, c2=?, c3=?, c4=?, c5=?, c6=?, c7=?, c8=?, c9=?, c10=?, calificacion_final=?, estado_materia=?, tipo_acreditacion=?, fecha_modificacion=CURRENT_TIMESTAMP
           WHERE id_inscripcion=?
         `);
-
         // 4. Ejecutamos según corresponda
         alumnos.forEach((a) => {
           if (a.id_inscripcion) {
@@ -1053,10 +1046,8 @@ ipcMain.handle("save-calificaciones-masivas", async (event, payload) => {
             ]);
           }
         });
-
         stmtInsert.finalize();
         stmtUpdate.finalize();
-
         // Si todo salió bien, sellamos la transacción
         db.run("COMMIT", (err) => {
           if (err) reject(err);
